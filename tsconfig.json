@@ -24,6 +24,12 @@
     "noEmit": true,
     "incremental": true,
     "isolatedModules": true,
+    "types": [
+      "node",
+      "react",
+      "react-dom",
+      "js-cookie"
+    ],
     "plugins": [
       {
         "name": "next"
@@ -34,7 +40,8 @@
     "**/*.ts",
     "**/*.tsx",
     "next-env.d.ts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
