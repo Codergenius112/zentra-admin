@@ -103,18 +103,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isPublic = PUBLIC_ROUTES.includes(pathname);
 
     if (!token && !isPublic) {
-      router.push('/auth/login');
+      router.replace('/auth/login');
       return;
     }
 
     if ((token || isAuthenticated) && pathname === '/auth/login') {
-      router.push(getDefaultRoute(user));
+      router.replace(getDefaultRoute(user));
       return;
     }
 
     if ((token || isAuthenticated) && user && !isPublic) {
       if (!canAccess(pathname, user)) {
-        router.push(getDefaultRoute(user));
+        router.replace(getDefaultRoute(user));
       }
     }
   }, [pathname, router, isAuthenticated, user, isChecking]);

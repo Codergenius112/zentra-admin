@@ -7,7 +7,7 @@ import type {
   AuthResponse,
 } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL //|| 'http://localhost:3000';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const COOKIE_OPTIONS = { secure: IS_PRODUCTION, sameSite: IS_PRODUCTION ? ('strict' as const) : ('lax' as const) };
 

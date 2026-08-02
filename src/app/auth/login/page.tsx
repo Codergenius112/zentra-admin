@@ -51,7 +51,7 @@ export default function LoginPage() {
 
     try {
       await login(formData.email, formData.password);
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (err) {
       // Error already set in store
     }
