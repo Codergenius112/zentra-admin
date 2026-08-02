@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, DragEvent } from 'react';
+import Image from 'next/image';
 import { apiClient } from '@/services/api';
 
 interface MediaUploadProps {
@@ -114,10 +115,12 @@ export default function MediaUpload({ onUploadComplete, existingUrls = [], maxFi
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
           {previews.map((preview, index) => (
             <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border">
-              {preview.url.match(/\.(mp4|mov|avi)$/i) ? (
+              {preview.url.match(/\.(mp4|mov|avi|mkv)$/i) ? (
                 <video src={preview.url} className="w-full h-full object-cover" />
               ) : (
-                <img src={preview.url} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
+                <div className="relative w-full h-full">
+                  <Image src={preview.url} alt={`Upload ${index + 1}`} fill className="object-cover" />
+                </div>
               )}
               <button
                 type="button"

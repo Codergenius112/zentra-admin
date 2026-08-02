@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { apiClient } from '@/services/api';
 import MediaUpload from '@/components/MediaUpload';
 import FloorPlanEditor from '@/components/FloorPlanEditor';
@@ -254,15 +255,25 @@ export default function VenuesPage() {
             <p><strong>City:</strong> {selectedVenue.city}</p>
             <p><strong>Max Capacity:</strong> {selectedVenue.maxCapacity || 'Not set'}</p>
             <p><strong>Created:</strong> {new Date(selectedVenue.createdAt).toLocaleDateString()}</p>
-            {selectedVenue.mediaUrls?.length > 0 && (
+            {selectedVenue.mediaUrls?.length > 0 ? (
               <div>
                 <strong>Media:</strong>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 grid grid-cols-2 gap-2">
                   {selectedVenue.mediaUrls.map((url, i) => (
-                    <img key={i} src={url} alt="" className="w-20 h-20 object-cover rounded" />
+                    <div key={i} className="overflow-hidden rounded-lg border bg-gray-100">
+                      {url.match(/\.(mp4|mov|avi|mkv)$/i) ? (
+                        <video src={url} controls className="w-full h-24 object-cover" />
+                      ) : (
+                        <div className="relative w-full h-24">
+                          <Image src={url} alt="" fill className="object-cover" />
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
+            ) : (
+              <p className="text-gray-500">No media uploaded yet.</p>
             )}
           </div>
         </Modal>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '@/services/api';
 import type { CarListing, Booking } from '@/types';
 import MediaUpload from '@/components/MediaUpload';
+import Image from 'next/image';
 import useUIStore from '@/store/ui.store';
 
 const CAUTION_COLORS: Record<string, string> = {
@@ -154,6 +155,17 @@ export default function CarsPage() {
                 </span>
               </div>
               <p className="text-xs text-gray-500 mb-3">{l.color} · {l.plateNumber} · {l.transmission}</p>
+              {l.images?.length > 0 && (
+                <div className="mb-3 overflow-hidden rounded-lg border bg-gray-100">
+                  {l.images[0].match(/\.(mp4|mov|avi|mkv)$/i) ? (
+                    <video src={l.images[0]} controls className="w-full h-28 object-cover" />
+                  ) : (
+                    <div className="relative w-full h-28">
+                      <Image src={l.images[0]} alt={`${l.make} ${l.model}`} fill className="object-cover" />
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="text-sm text-gray-700 space-y-1">
                 <div>₦{Number(l.pricePerDay).toLocaleString()} / day · {l.seats} seats</div>
                 <div>{l.city}, {l.state}{l.withDriver ? ' · With Driver' : ''}</div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '@/services/api';
 import type { ApartmentListing, Booking } from '@/types';
 import MediaUpload from '@/components/MediaUpload';
+import Image from 'next/image';
 import useUIStore from '@/store/ui.store';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -155,6 +156,17 @@ export default function ApartmentsPage() {
                 </span>
               </div>
               <p className="text-xs text-gray-500 mb-3">{l.city}, {l.state}</p>
+              {l.images?.length > 0 && (
+                <div className="mb-3 overflow-hidden rounded-lg border bg-gray-100">
+                  {l.images[0].match(/\.(mp4|mov|avi|mkv)$/i) ? (
+                    <video src={l.images[0]} controls className="w-full h-28 object-cover" />
+                  ) : (
+                    <div className="relative w-full h-28">
+                      <Image src={l.images[0]} alt={l.name} fill className="object-cover" />
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="text-sm text-gray-700 space-y-1">
                 <div>₦{Number(l.pricePerNight).toLocaleString()} / night</div>
                 <div>{l.bedrooms} bed · {l.bathrooms} bath · {l.maxGuests} guests</div>

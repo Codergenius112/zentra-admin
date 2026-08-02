@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { apiClient } from '@/services/api';
 import type { Event } from '@/types';
 import { CommissionPayer } from '@/types';
+import MediaUpload from '@/components/MediaUpload';
 import useUIStore from '@/store/ui.store';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -38,6 +40,7 @@ export default function EventsPage() {
   const [addTables, setAddTables] = useState(false);
   const [tables, setTables] = useState<Array<{ name: string; category: string; capacity: string; price: string }>>([]);
   const [venues, setVenues] = useState<Array<{ id: string; name: string }>>([]);
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [tablesVenueId, setTablesVenueId] = useState('');
   const [form, setForm] = useState({
     name: '', description: '', venueId: '', startDate: '',
@@ -75,6 +78,7 @@ export default function EventsPage() {
         ticketPrice: Number(form.ticketPrice),
         djs: form.djs ? form.djs.split(',').map(d => d.trim()) : [],
         commissionPayer: form.commissionPayer as CommissionPayer,
+        images: mediaUrls,
       };
       const event = await apiClient.events.create(eventData);
 
@@ -96,6 +100,7 @@ export default function EventsPage() {
       setAddTables(false);
       setTables([]);
       setTablesVenueId('');
+      setMediaUrls([]);
       fetchEvents();
       addToast('Event created successfully', 'success');
     } catch (e: any) {
@@ -214,6 +219,14 @@ export default function EventsPage() {
               </select>
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Media (images/videos)</label>
+              <MediaUpload
+                onUploadComplete={setMediaUrls}
+                existingUrls={mediaUrls}
+                maxFiles={10}
+              />
+            </div>
+            <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
               <textarea rows={3}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -316,6 +329,26 @@ export default function EventsPage() {
             {selectedEvent.dresscode && <p><strong>Dresscode:</strong> {selectedEvent.dresscode}</p>}
             {selectedEvent.djs?.length > 0 && <p><strong>DJs:</strong> {selectedEvent.djs.join(', ')}</p>}
             <p className="pt-2"><strong>Description:</strong> {selectedEvent.description}</p>
+            {selectedEvent.images?.length > 0 ? (
+              <div className="pt-3">
+                <p className="font-medium text-gray-800 mb-2">Media</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedEvent.images.map((url, index) => (
+                    <div key={`${url}-${index}`} className="overflow-hidden rounded-lg border bg-gray-100">
+                      {url.match(/\.(mp4|mov|avi|mkv)$/i) ? (
+                        <video src={url} controls className="w-full h-32 object-cover" />
+                      ) : (
+                        <div className="relative w-full h-32">
+                          <Image src={url} alt={`Event media ${index + 1}`} fill className="object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="pt-3 text-sm text-gray-500">No media uploaded yet.</p>
+            )}
           </div>
         </Modal>
       )}
