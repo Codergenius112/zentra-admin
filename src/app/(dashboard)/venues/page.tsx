@@ -31,6 +31,7 @@ export default function VenuesPage() {
   const [showFloorPlan, setShowFloorPlan] = useState<Venue | null>(null);
   const [floorPlanTables, setFloorPlanTables] = useState<TableListing[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [creatingTable, setCreatingTable] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [form, setForm] = useState({
     name: '', address: '', city: '', maxCapacity: '',
@@ -87,6 +88,38 @@ export default function VenuesPage() {
       fetchVenues();
       addToast(`Venue ${venue.isActive ? 'deactivated' : 'activated'}`, 'success');
     } catch (e: any) { addToast(e?.response?.data?.message ?? 'Update failed', 'error'); }
+  };
+
+  const handleToggleWalkIn = async (venue: Venue) => {
+    try {
+      await apiClient.venues.update(venue.id, { allowWalkInOrders: !venue.allowWalkInOrders });
+      fetchVenues();
+      addToast(`Walk-in orders ${venue.allowWalkInOrders ? 'disabled' : 'enabled'} for ${venue.name}`, 'success');
+    } catch (e: any) { addToast(e?.response?.data?.message ?? 'Update failed', 'error'); }
+  };
+
+  const handleCreateFloorPlanTable = async () => {
+    if (!showFloorPlan) return;
+    try {
+      setCreatingTable(true);
+      await apiClient.tables.createListing({
+        venueId: showFloorPlan.id,
+        name: `Table ${floorPlanTables.length + 1}`,
+        category: 'standard',
+        capacity: 4,
+        price: 0,
+        description: 'Created from floor plan',
+        features: [],
+      });
+      const res = await apiClient.tables.listings({ limit: 200 }) as any;
+      const allTables = res.data?.listings ?? res.data?.data ?? res.data ?? [];
+      setFloorPlanTables(allTables.filter((t: any) => t.venueId === showFloorPlan.id));
+      addToast('Table added to the floor plan', 'success');
+    } catch (e: any) {
+      addToast(e?.response?.data?.message ?? 'Could not add table', 'error');
+    } finally {
+      setCreatingTable(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -156,6 +189,14 @@ export default function VenuesPage() {
                       : 'border-green-400 text-green-600 hover:bg-green-50'
                   }`}>
                   {venue.isActive ? 'Deactivate' : 'Activate'}
+                </button>
+                <button onClick={() => handleToggleWalkIn(venue)}
+                  className={`flex-1 py-1.5 border rounded-lg text-xs font-medium ${
+                    venue.allowWalkInOrders !== false
+                      ? 'border-indigo-400 text-indigo-600 hover:bg-indigo-50'
+                      : 'border-gray-400 text-gray-600 hover:bg-gray-50'
+                  }`}>
+                  {venue.allowWalkInOrders !== false ? 'Walk-in On' : 'Walk-in Off'}
                 </button>
                 <button onClick={() => handleDelete(venue.id)}
                   className="flex-1 py-1.5 border border-red-400 text-red-600 rounded-lg text-xs font-medium hover:bg-red-50">
@@ -235,12 +276,21 @@ export default function VenuesPage() {
                 <h2 className="text-2xl font-bold text-gray-900">Floor Plan: {showFloorPlan.name}</h2>
                 <p className="text-sm text-gray-500 mt-1">Drag tables to position them. Click to select and rotate/resize.</p>
               </div>
-              <button
-                onClick={() => setShowFloorPlan(null)}
-                className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium text-sm"
-              >
-                ✕ Close
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCreateFloorPlanTable}
+                  disabled={creatingTable}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm disabled:opacity-50"
+                >
+                  {creatingTable ? 'Adding...' : '➕ Add Table'}
+                </button>
+                <button
+                  onClick={() => setShowFloorPlan(null)}
+                  className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium text-sm"
+                >
+                  ✕ Close
+                </button>
+              </div>
             </div>
             <FloorPlanEditor
               venue={showFloorPlan}

@@ -179,6 +179,7 @@ export interface Venue {
   ownerId?: string;
   mediaUrls: string[];
   isActive: boolean;
+  allowWalkInOrders?: boolean;
   hasFloorPlan?: boolean;
   floorPlanData?: {
     width: number;
