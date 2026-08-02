@@ -14,6 +14,7 @@ interface AuthState {
   logout: () => Promise<void>;
   clearError: () => void;
   restoreSession: () => Promise<void>;
+  clearSession: () => void;
 }
 
 const useAuthStore = create<AuthState>()(
@@ -65,6 +66,16 @@ const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      // Wipes persisted auth state. Called when the accessToken cookie is
+      // missing so a stale localStorage copy of isAuthenticated/user can't
+      // fight the route-guard logic and cause a login/dashboard redirect loop.
+      clearSession: () =>
+        set({
+          user: null,
+          isAuthenticated: false,
+          sessionRestored: false,
+        }),
 
       restoreSession: async () => {
         const { sessionRestored, user } = get();

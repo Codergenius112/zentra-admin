@@ -8,8 +8,13 @@ import type {
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL //|| 'http://localhost:3000';
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const COOKIE_OPTIONS = { secure: IS_PRODUCTION, sameSite: IS_PRODUCTION ? ('strict' as const) : ('lax' as const) };
+// Cookies with `secure: true` are silently dropped by the browser on
+// non-HTTPS origins (e.g. `npm start` on http://localhost:3000). Base the
+// flag on the actual page protocol, not NODE_ENV, so production builds
+// still work locally over HTTP while still being secure once deployed
+// behind HTTPS.
+const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+const COOKIE_OPTIONS = { secure: isHttps, sameSite: isHttps ? ('strict' as const) : ('lax' as const) };
 
 class ApiClient {
   private axiosInstance: AxiosInstance;
