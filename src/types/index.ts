@@ -286,11 +286,22 @@ export interface NotificationCampaign {
   title: string;
   body: string;
   targetScope: BusinessScope | 'ALL';
+  tierId: string | null;
+  tierMaxRecipients: number | null;
   status: 'DRAFT' | 'SENT' | 'FAILED';
   sentAt?: string;
   recipientCount: number;
   feePaid: number;
   paymentStatus: 'PAID' | 'UNPAID';
+  createdAt: string;
+}
+
+export interface CampaignTier {
+  id: string;
+  label: string;
+  maxRecipients: number;
+  price: number;
+  isActive: boolean;
   createdAt: string;
 }
 

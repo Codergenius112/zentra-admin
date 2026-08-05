@@ -3,14 +3,17 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Venue, TableListing } from '@/types';
 import { apiClient } from '@/services/api';
+import useUIStore from '@/store/ui.store';
 
 interface FloorPlanEditorProps {
   venue: Venue;
   tables: TableListing[];
   onSaved: () => void;
+  readOnly?: boolean;
 }
 
-export default function FloorPlanEditor({ venue, tables, onSaved }: FloorPlanEditorProps) {
+export default function FloorPlanEditor({ venue, tables, onSaved, readOnly = false }: FloorPlanEditorProps) {
+  const addToast = useUIStore(s => s.addToast);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
   const [tablePositions, setTablePositions] = useState<Record<string, { x: number; y: number; rotation: number; width: number; height: number }>>({});
@@ -53,6 +56,7 @@ export default function FloorPlanEditor({ venue, tables, onSaved }: FloorPlanEdi
   }, [venue, tables, canvasSize.width]);
 
   const handleMouseDown = (tableId: string, e: React.MouseEvent) => {
+    if (readOnly) return;
     e.preventDefault();
     setSelectedTable(tableId);
     setIsDragging(true);
@@ -131,16 +135,26 @@ export default function FloorPlanEditor({ venue, tables, onSaved }: FloorPlanEdi
         },
       });
 
-      // Save individual table positions
-      await Promise.all(
+      // Save individual table positions. Use allSettled so one failing
+      // table doesn't silently swallow the rest of the save.
+      const results = await Promise.allSettled(
         Object.entries(tablePositions).map(([tableId, pos]) =>
           apiClient.tables.updatePosition(tableId, pos as any),
         ),
       );
+      const failed = results.filter((r) => r.status === 'rejected').length;
 
+      if (failed > 0) {
+        addToast(
+          `Floor plan saved, but ${failed} table position${failed > 1 ? 's' : ''} failed to save. Try again.`,
+          'warning',
+        );
+      } else {
+        addToast('Floor plan saved', 'success');
+      }
       onSaved();
-    } catch (error) {
-      console.error('Failed to save floor plan:', error);
+    } catch (error: any) {
+      addToast(error?.response?.data?.message ?? 'Failed to save floor plan', 'error');
     } finally {
       setSaving(false);
     }
@@ -162,15 +176,17 @@ export default function FloorPlanEditor({ venue, tables, onSaved }: FloorPlanEdi
       {/* Toolbar */}
       <div className="flex items-center justify-between bg-white p-4 rounded-lg border">
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={hasFloorPlan}
-              onChange={(e) => setHasFloorPlan(e.target.checked)}
-              className="rounded"
-            />
-            Enable Floor Plan
-          </label>
+          {!readOnly && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={hasFloorPlan}
+                onChange={(e) => setHasFloorPlan(e.target.checked)}
+                className="rounded"
+              />
+              Enable Floor Plan
+            </label>
+          )}
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -183,35 +199,41 @@ export default function FloorPlanEditor({ venue, tables, onSaved }: FloorPlanEdi
         </div>
 
         <div className="flex items-center gap-2">
-          {selectedTable && (
+          {readOnly ? (
+            <span className="text-xs text-gray-400 italic">Read-only — view only</span>
+          ) : (
             <>
+              {selectedTable && (
+                <>
+                  <button
+                    onClick={handleRotate}
+                    className="px-3 py-1.5 text-sm bg-gray-100 rounded hover:bg-gray-200"
+                  >
+                    ↻ Rotate
+                  </button>
+                  <button
+                    onClick={() => handleResize('larger')}
+                    className="px-3 py-1.5 text-sm bg-gray-100 rounded hover:bg-gray-200"
+                  >
+                    + Resize
+                  </button>
+                  <button
+                    onClick={() => handleResize('smaller')}
+                    className="px-3 py-1.5 text-sm bg-gray-100 rounded hover:bg-gray-200"
+                  >
+                    - Resize
+                  </button>
+                </>
+              )}
               <button
-                onClick={handleRotate}
-                className="px-3 py-1.5 text-sm bg-gray-100 rounded hover:bg-gray-200"
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                ↻ Rotate
-              </button>
-              <button
-                onClick={() => handleResize('larger')}
-                className="px-3 py-1.5 text-sm bg-gray-100 rounded hover:bg-gray-200"
-              >
-                + Resize
-              </button>
-              <button
-                onClick={() => handleResize('smaller')}
-                className="px-3 py-1.5 text-sm bg-gray-100 rounded hover:bg-gray-200"
-              >
-                - Resize
+                {saving ? 'Saving...' : 'Save Floor Plan'}
               </button>
             </>
           )}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save Floor Plan'}
-          </button>
         </div>
       </div>
 
@@ -240,7 +262,7 @@ export default function FloorPlanEditor({ venue, tables, onSaved }: FloorPlanEdi
           return (
             <div
               key={table.id}
-              className={`absolute cursor-move border-2 rounded-lg shadow-md hover:shadow-lg transition-shadow ${getCategoryColor(table.category)} ${
+              className={`absolute ${readOnly ? 'cursor-default' : 'cursor-move'} border-2 rounded-lg shadow-md hover:shadow-lg transition-shadow ${getCategoryColor(table.category)} ${
                 selectedTable === table.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''
               }`}
               style={{

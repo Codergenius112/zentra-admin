@@ -3,8 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/services/api';
 import { formatCurrency } from '@/lib/utils';
+import useAuthStore from '@/store/auth.store';
+import { UserRole } from '@/types';
 
 export default function DashboardPage() {
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
+
   const { data: metrics, isLoading, error } = useQuery({
     queryKey: ['analytics', 'dashboard'],
     queryFn: () => apiClient.analytics.dashboard(),
@@ -28,7 +33,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          {isSuperAdmin ? 'System-wide, across all businesses' : 'Your business'}
+        </p>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -45,7 +55,9 @@ export default function DashboardPage() {
 
         {/* Total Revenue */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-gray-600 text-sm font-medium mb-2">Total Revenue</h3>
+          <h3 className="text-gray-600 text-sm font-medium mb-2">
+            {isSuperAdmin ? 'Total Revenue' : 'Your Business Revenue'}
+          </h3>
           <div>
             <p className="text-3xl font-bold">
               {formatCurrency(metrics?.revenue?.total)}

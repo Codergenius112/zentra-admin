@@ -3,7 +3,7 @@ import Cookies from 'js-cookie';
 import type {
   Booking, Order, AuditLog, DashboardMetrics, PlatformSettings,
   ApartmentListing, CarListing, Event, TicketType, Venue,
-  InventoryItem, NotificationCampaign, User, BusinessScope, PaginatedResponse,
+  InventoryItem, NotificationCampaign, CampaignTier, User, BusinessScope, PaginatedResponse,
   AuthResponse,
 } from '@/types';
 
@@ -145,7 +145,13 @@ class ApiClient {
       this.patch<Booking>(`/admin/bookings/${id}/status`, { status }),
     listTables: (params?: { status?: string }) =>
       this.get<PaginatedResponse<Booking>>('/admin/bookings/tables', { params }),
-    walkIn: (dto: { tableId: string; guestName: string; guestCount: number; notes?: string }) =>
+    walkIn: (dto: {
+      tableId: string; guestName: string; guestCount: number; notes?: string;
+      salesAmount?: number;
+      items?: Array<{ itemId?: string; name: string; quantity: number; price: number; specialInstructions?: string }>;
+      inventoryItemId?: string; inventoryQuantity?: number; inventoryReason?: string;
+      includeDefaultOrder?: boolean;
+    }) =>
       this.post<Booking>('/admin/bookings/tables/walk-in', dto),
     refundCautionFee: (id: string) =>
       this.post<Booking>(`/admin/bookings/${id}/caution-fee/refund`),
@@ -165,6 +171,12 @@ class ApiClient {
       this.patch<Order>(`/admin/orders/${id}/status`, { status }),
     assign: (id: string, waiterId: string) =>
       this.post<Order>(`/admin/orders/${id}/assign`, { waiterId }),
+    manualPurchase: (data: {
+      bookingId: string;
+      items: Array<{ itemId?: string; name: string; quantity: number; price: number; specialInstructions?: string }>;
+      inventoryItemId?: string; inventoryQuantity?: number; inventoryReason?: string;
+    }) =>
+      this.post<Order>('/admin/orders/manual-purchase', data),
   };
 
   // ─── Staff ─────────────────────────────────────────────────────────────────
@@ -245,7 +257,13 @@ class ApiClient {
       this.patch<any>(`/tables/listings/${id}/position`, position),
     bookings: (params?: { status?: string; limit?: number }) =>
       this.get<PaginatedResponse<Booking>>('/admin/bookings/tables', { params }),
-    walkIn: (data: { tableId: string; guestName: string; guestCount: number; notes?: string }) =>
+    walkIn: (data: {
+      tableId: string; guestName: string; guestCount: number; notes?: string;
+      salesAmount?: number;
+      items?: Array<{ itemId?: string; name: string; quantity: number; price: number; specialInstructions?: string }>;
+      inventoryItemId?: string; inventoryQuantity?: number; inventoryReason?: string;
+      includeDefaultOrder?: boolean;
+    }) =>
       this.bookings.walkIn(data),
   };
 
@@ -329,10 +347,12 @@ class ApiClient {
   campaigns = {
     list: (params?: { limit?: number; offset?: number }) =>
       this.get<PaginatedResponse<NotificationCampaign>>('/campaigns', { params }),
-    create: (data: { title: string; body: string; targetScope: string }) =>
+    create: (data: { title: string; body: string; targetScope: string; tierId: string }) =>
       this.post<NotificationCampaign>('/campaigns', data),
     send: (id: string) =>
       this.post<NotificationCampaign>(`/campaigns/${id}/send`),
+    listTiers: () =>
+      this.get<CampaignTier[]>('/campaigns/tiers'),
   };
 
   // ─── Venues ────────────────────────────────────────────────────────────────
@@ -367,6 +387,12 @@ class ApiClient {
       this.get<any>('/super-admin/financials', { params }),
     getAuditLogs: (params?: any) =>
       this.get<PaginatedResponse<AuditLog>>('/super-admin/audit-logs', { params }),
+    listCampaignTiers: () =>
+      this.get<CampaignTier[]>('/super-admin/campaign-tiers'),
+    createCampaignTier: (data: { label: string; maxRecipients: number; price: number }) =>
+      this.post<CampaignTier>('/super-admin/campaign-tiers', data),
+    updateCampaignTier: (id: string, data: Partial<{ label: string; maxRecipients: number; price: number; isActive: boolean }>) =>
+      this.patch<CampaignTier>(`/super-admin/campaign-tiers/${id}`, data),
   };
 }
 

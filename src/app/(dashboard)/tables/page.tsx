@@ -80,6 +80,7 @@ export default function TablesPage() {
         guestName:  walkInForm.guestName,
         guestCount: Number(walkInForm.guestCount),
         notes:      walkInForm.notes,
+        includeDefaultOrder: false, // seating only — purchases are logged separately under Orders
       });
       setShowWalkIn(false);
       setWalkInForm({ tableId: '', guestName: '', guestCount: '', notes: '' });
@@ -221,8 +222,19 @@ export default function TablesPage() {
               <button onClick={() => setShowWalkIn(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
             <div className="p-6 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Table</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={walkInForm.tableId}
+                  onChange={e => setWalkInForm(f => ({ ...f, tableId: e.target.value }))}>
+                  <option value="">Select a table...</option>
+                  {listings.map((l: any) => (
+                    <option key={l.id} value={l.id}>{l.name ?? `Table ${l.tableNumber}`}</option>
+                  ))}
+                </select>
+              </div>
               {([
-                { label: 'Table ID',          key: 'tableId',    type: 'text'   },
                 { label: 'Guest Name',        key: 'guestName',  type: 'text'   },
                 { label: 'Party Size',        key: 'guestCount', type: 'number' },
                 { label: 'Notes (optional)',  key: 'notes',      type: 'text'   },
@@ -235,10 +247,13 @@ export default function TablesPage() {
                     onChange={e => setWalkInForm(f => ({ ...f, [key]: e.target.value }))} />
                 </div>
               ))}
+              <p className="text-xs text-gray-400 pt-1">
+                Just seats the guest — log their purchases afterwards from the Orders page.
+              </p>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowWalkIn(false)}
                   className="flex-1 py-2 border rounded-lg text-sm font-medium text-gray-600">Cancel</button>
-                <button onClick={handleWalkIn} disabled={submitting}
+                <button onClick={handleWalkIn} disabled={submitting || !walkInForm.tableId || !walkInForm.guestName}
                   className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
                   {submitting ? 'Creating...' : 'Create Walk-in'}
                 </button>

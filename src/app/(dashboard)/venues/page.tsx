@@ -6,7 +6,9 @@ import { apiClient } from '@/services/api';
 import MediaUpload from '@/components/MediaUpload';
 import FloorPlanEditor from '@/components/FloorPlanEditor';
 import useUIStore from '@/store/ui.store';
+import useAuthStore from '@/store/auth.store';
 import type { Venue, TableListing } from '@/types';
+import { UserRole } from '@/types';
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -24,6 +26,8 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 
 export default function VenuesPage() {
   const addToast = useUIStore(s => s.addToast);
+  const user = useAuthStore(s => s.user);
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const [venues, setVenues] = useState<Venue[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -53,10 +57,9 @@ export default function VenuesPage() {
   const openFloorPlan = async (venue: Venue) => {
     setShowFloorPlan(venue);
     try {
-      const res = await apiClient.tables.listings({ limit: 200 }) as any;
-      const allTables = res.data?.listings ?? res.data?.data ?? res.data ?? [];
-      // Filter tables for this venue
-      setFloorPlanTables(allTables.filter((t: any) => t.venueId === venue.id));
+      const res = await apiClient.tables.listings({ limit: 200, venueId: venue.id }) as any;
+      const venueTables = res.data?.listings ?? res.data?.data ?? res.data ?? [];
+      setFloorPlanTables(venueTables);
     } catch (e) {
       console.error(e);
       setFloorPlanTables([]);
@@ -112,9 +115,9 @@ export default function VenuesPage() {
         description: 'Created from floor plan',
         features: [],
       });
-      const res = await apiClient.tables.listings({ limit: 200 }) as any;
-      const allTables = res.data?.listings ?? res.data?.data ?? res.data ?? [];
-      setFloorPlanTables(allTables.filter((t: any) => t.venueId === showFloorPlan.id));
+      const res = await apiClient.tables.listings({ limit: 200, venueId: showFloorPlan.id }) as any;
+      const venueTables = res.data?.listings ?? res.data?.data ?? res.data ?? [];
+      setFloorPlanTables(venueTables);
       addToast('Table added to the floor plan', 'success');
     } catch (e: any) {
       addToast(e?.response?.data?.message ?? 'Could not add table', 'error');
@@ -181,7 +184,7 @@ export default function VenuesPage() {
                 </button>
                 <button onClick={() => openFloorPlan(venue)}
                   className="flex-1 py-1.5 border border-purple-500 text-purple-600 rounded-lg text-xs font-medium hover:bg-purple-50">
-                  🎨 Floor Plan
+                  🎨 {isSuperAdmin ? 'View Floor Plan' : 'Floor Plan'}
                 </button>
                 <button onClick={() => handleToggleActive(venue)}
                   className={`flex-1 py-1.5 border rounded-lg text-xs font-medium ${
@@ -285,16 +288,22 @@ export default function VenuesPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Floor Plan: {showFloorPlan.name}</h2>
-                <p className="text-sm text-gray-500 mt-1">Drag tables to position them. Click to select and rotate/resize.</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {isSuperAdmin
+                    ? 'Read-only view for oversight. Editing is restricted to the business admin/manager.'
+                    : 'Drag tables to position them. Click to select and rotate/resize.'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCreateFloorPlanTable}
-                  disabled={creatingTable}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm disabled:opacity-50"
-                >
-                  {creatingTable ? 'Adding...' : '➕ Add Table'}
-                </button>
+                {!isSuperAdmin && (
+                  <button
+                    onClick={handleCreateFloorPlanTable}
+                    disabled={creatingTable}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm disabled:opacity-50"
+                  >
+                    {creatingTable ? 'Adding...' : '➕ Add Table'}
+                  </button>
+                )}
                 <button
                   onClick={() => setShowFloorPlan(null)}
                   className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium text-sm"
@@ -306,6 +315,7 @@ export default function VenuesPage() {
             <FloorPlanEditor
               venue={showFloorPlan}
               tables={floorPlanTables}
+              readOnly={isSuperAdmin}
               onSaved={() => {
                 addToast('Floor plan saved successfully', 'success');
                 fetchVenues();

@@ -121,6 +121,18 @@ export default function OrdersPage() {
   const [updating, setUpdating]         = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Manual purchase state
+  const [showManualPurchase, setShowManualPurchase] = useState(false);
+  const [activeBookings, setActiveBookings] = useState<Array<{ id: string; guestName: string; tableName: string }>>([]);
+  const [purchaseBookingId, setPurchaseBookingId] = useState('');
+  const [purchaseItems, setPurchaseItems] = useState<Array<{ name: string; quantity: string; price: string }>>([
+    { name: '', quantity: '1', price: '' },
+  ]);
+  const [deductInventory, setDeductInventory] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<Array<{ id: string; name: string; currentStock: number }>>([]);
+  const [inventorySelection, setInventorySelection] = useState({ itemId: '', quantity: '1', reason: '' });
+  const [recordingPurchase, setRecordingPurchase] = useState(false);
+
   // Menu state
   const [venues, setVenues]         = useState<Venue[]>([]);
   const [selectedVenue, setSelectedVenue] = useState('');
@@ -230,6 +242,65 @@ export default function OrdersPage() {
     }
   };
 
+  const openManualPurchase = async () => {
+    setShowManualPurchase(true);
+    try {
+      const [bookingsRes, inventoryRes] = await Promise.all([
+        apiClient.tables.bookings({}) as any,
+        apiClient.inventory.list({ limit: 200 }) as any,
+      ]);
+      const bookings = bookingsRes.data?.data ?? bookingsRes.data ?? [];
+      setActiveBookings(
+        bookings
+          .filter((b: any) => ['CONFIRMED', 'ACTIVE'].includes(b.status))
+          .map((b: any) => ({
+            id: b.id,
+            guestName: b.metadata?.guestName ?? (b.user ? `${b.user.firstName} ${b.user.lastName}` : 'Guest'),
+            tableName: b.metadata?.tableName ?? b.id.slice(0, 8),
+          })),
+      );
+      setInventoryItems(inventoryRes.data?.data ?? inventoryRes.data ?? []);
+    } catch (e) { console.error(e); }
+  };
+
+  const resetManualPurchase = () => {
+    setPurchaseBookingId('');
+    setPurchaseItems([{ name: '', quantity: '1', price: '' }]);
+    setDeductInventory(false);
+    setInventorySelection({ itemId: '', quantity: '1', reason: '' });
+  };
+
+  const handleRecordPurchase = async () => {
+    setRecordingPurchase(true);
+    try {
+      const items = purchaseItems
+        .filter(i => i.name.trim())
+        .map(i => ({ name: i.name.trim(), quantity: Number(i.quantity) || 1, price: Number(i.price) || 0 }));
+
+      if (!items.length) {
+        addToast('Add at least one item', 'warning');
+        setRecordingPurchase(false);
+        return;
+      }
+
+      await apiClient.orders.manualPurchase({
+        bookingId: purchaseBookingId,
+        items,
+        ...(deductInventory && inventorySelection.itemId ? {
+          inventoryItemId: inventorySelection.itemId,
+          inventoryQuantity: Number(inventorySelection.quantity) || 1,
+          inventoryReason: inventorySelection.reason || 'Manual purchase',
+        } : {}),
+      });
+      setShowManualPurchase(false);
+      resetManualPurchase();
+      tab === 'live' ? fetchLive() : tab === 'all' ? fetchAll() : null;
+      addToast('Purchase recorded', 'success');
+    } catch (e: any) {
+      addToast(e?.response?.data?.message ?? 'Could not record purchase', 'error');
+    } finally { setRecordingPurchase(false); }
+  };
+
   const handleUpdate = async (id: string, status: string) => {
     setUpdating(id);
     try {
@@ -279,6 +350,10 @@ export default function OrdersPage() {
               Auto-refresh (8s)
             </label>
           )}
+          <button onClick={openManualPurchase}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition">
+            + Manual Purchase
+          </button>
           {(['live', 'all', 'menu'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
@@ -485,6 +560,106 @@ export default function OrdersPage() {
                 className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
                 {menuSaving ? 'Creating...' : 'Add Item'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showManualPurchase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">Manual Purchase</h3>
+              <button onClick={() => { setShowManualPurchase(false); resetManualPurchase(); }}
+                className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Table / Booking</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={purchaseBookingId}
+                  onChange={e => setPurchaseBookingId(e.target.value)}>
+                  <option value="">Select an active table...</option>
+                  {activeBookings.length === 0 && <option value="" disabled>No active bookings found</option>}
+                  {activeBookings.map(b => (
+                    <option key={b.id} value={b.id}>{b.guestName} — {b.tableName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-medium text-gray-600">Items Purchased</label>
+                  <button type="button"
+                    onClick={() => setPurchaseItems(items => [...items, { name: '', quantity: '1', price: '' }])}
+                    className="text-xs text-blue-600 font-medium hover:underline">+ Add item</button>
+                </div>
+                <div className="space-y-2">
+                  {purchaseItems.map((item, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <input type="text" placeholder="Item name"
+                        className="flex-[2] px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={item.name}
+                        onChange={e => setPurchaseItems(items => items.map((it, i) => i === idx ? { ...it, name: e.target.value } : it))} />
+                      <input type="number" placeholder="Qty" min={1}
+                        className="w-16 px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={item.quantity}
+                        onChange={e => setPurchaseItems(items => items.map((it, i) => i === idx ? { ...it, quantity: e.target.value } : it))} />
+                      <input type="number" placeholder="Price ₦" min={0}
+                        className="w-24 px-2 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={item.price}
+                        onChange={e => setPurchaseItems(items => items.map((it, i) => i === idx ? { ...it, price: e.target.value } : it))} />
+                      {purchaseItems.length > 1 && (
+                        <button type="button" onClick={() => setPurchaseItems(items => items.filter((_, i) => i !== idx))}
+                          className="text-gray-400 hover:text-red-500 text-lg leading-none px-1">&times;</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right text-sm text-gray-600 mt-2">
+                  Total: <strong>₦{purchaseItems.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.price) || 0), 0).toLocaleString()}</strong>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-600 mb-2">
+                  <input type="checkbox" checked={deductInventory} onChange={e => setDeductInventory(e.target.checked)} />
+                  Deduct from inventory
+                </label>
+                {deductInventory && (
+                  <div className="space-y-2">
+                    <select
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={inventorySelection.itemId}
+                      onChange={e => setInventorySelection(s => ({ ...s, itemId: e.target.value }))}>
+                      <option value="">Select inventory item...</option>
+                      {inventoryItems.map(item => (
+                        <option key={item.id} value={item.id}>{item.name} ({item.currentStock} in stock)</option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input type="number" placeholder="Quantity" min={1}
+                        className="w-1/3 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={inventorySelection.quantity}
+                        onChange={e => setInventorySelection(s => ({ ...s, quantity: e.target.value }))} />
+                      <input type="text" placeholder="Reason (optional)"
+                        className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={inventorySelection.reason}
+                        onChange={e => setInventorySelection(s => ({ ...s, reason: e.target.value }))} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setShowManualPurchase(false); resetManualPurchase(); }}
+                  className="flex-1 py-2 border rounded-lg text-sm font-medium text-gray-600">Cancel</button>
+                <button onClick={handleRecordPurchase} disabled={recordingPurchase || !purchaseBookingId}
+                  className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                  {recordingPurchase ? 'Recording...' : 'Record Purchase'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
