@@ -247,7 +247,7 @@ class ApiClient {
 
   // ─── Tables ────────────────────────────────────────────────────────────────
   tables = {
-    listings: (params?: { limit?: number; offset?: number }) =>
+    listings: (params?: { limit?: number; offset?: number; venueId?: string }) =>
       this.get<any>('/tables/listings', { params }),
     createListing: (data: any) =>
       this.post<any>('/tables/listings', data),
