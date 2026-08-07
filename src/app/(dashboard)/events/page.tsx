@@ -69,6 +69,18 @@ export default function EventsPage() {
   useEffect(() => { fetchEvents(); fetchVenues(); }, []);
 
   const handleCreate = async () => {
+    if (!form.name.trim()) {
+      addToast('Event name is required', 'warning');
+      return;
+    }
+    if (!form.startDate || !form.endDate) {
+      addToast('Start date and end date are required', 'warning');
+      return;
+    }
+    if (new Date(form.endDate) <= new Date(form.startDate)) {
+      addToast('End date must be after start date', 'warning');
+      return;
+    }
     setSubmitting(true);
     try {
       const eventData = {
@@ -82,11 +94,14 @@ export default function EventsPage() {
       };
       const event = await apiClient.events.create(eventData);
 
-      // Create tables if requested
-      if (addTables && tables.length > 0 && tablesVenueId) {
+      // Create tables if requested. If the event has a venue, scope tables
+      // to that venue; otherwise scope them directly to the event itself
+      // (one-off events are independent of venues).
+      if (addTables && tables.length > 0) {
+        const createdEventId = (event as any).data?.id ?? (event as any).id;
         for (const table of tables) {
           await apiClient.tables.createListing({
-            venueId: tablesVenueId,
+            ...(tablesVenueId ? { venueId: tablesVenueId } : { eventId: createdEventId }),
             name: table.name,
             category: table.category,
             capacity: Number(table.capacity),
@@ -259,15 +274,16 @@ export default function EventsPage() {
               {addTables && (
                 <div className="mt-3 space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Select venue for tables</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Venue <span className="text-gray-400 font-normal">(optional — leave blank for a one-off event with no venue)</span>
+                    </label>
                     <select
                       className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={tablesVenueId}
                       onChange={e => setTablesVenueId(e.target.value)}>
-                      <option value="">Select a venue...</option>
+                      <option value="">No venue — tables belong to this event only</option>
                       {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                     </select>
-                    {!tablesVenueId && <p className="text-xs text-red-500 mt-1">Select a venue to create tables</p>}
                   </div>
                   {tables.map((table, idx) => (
                     <div key={idx} className="bg-gray-50 p-3 rounded-lg space-y-2">
