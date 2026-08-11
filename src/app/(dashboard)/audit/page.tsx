@@ -156,7 +156,9 @@ export default function AuditPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">
-                        <div className="font-mono">{log.actorId?.slice(0, 8)}...</div>
+                        <div className="font-medium text-gray-800">
+                          {log.actorName ?? (log.actorId === 'SYSTEM' ? 'System' : `${log.actorId?.slice(0, 8)}...`)}
+                        </div>
                         {log.actorRole && <div className="text-gray-400">{log.actorRole}</div>}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">

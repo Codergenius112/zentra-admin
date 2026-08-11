@@ -102,7 +102,7 @@ export default function InventoryPage() {
   const [submitting, setSubmitting]     = useState(false);
   const [createForm, setCreateForm] = useState({
     name: '', sku: '', category: CATEGORIES[0], unit: '',
-    currentStock: '', lowStockThreshold: '', businessScope: SCOPES[0], venueId: '',
+    currentStock: '', lowStockThreshold: '', sellingPrice: '', businessScope: SCOPES[0], venueId: '',
   });
 
   const fetchItems = async () => {
@@ -128,6 +128,7 @@ export default function InventoryPage() {
         ...createForm,
         currentStock:      Number(createForm.currentStock),
         lowStockThreshold: Number(createForm.lowStockThreshold),
+        sellingPrice:      Number(createForm.sellingPrice) || 0,
         businessScope:     createForm.businessScope as BusinessScope,
         venueId:           createForm.venueId || undefined,
       } as any);
@@ -196,14 +197,14 @@ export default function InventoryPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Item','SKU','Category','Scope','Stock','Threshold','Status',''].map(h => (
+                {['Item','SKU','Category','Scope','Stock','Threshold','Price','Status',''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-12 text-gray-400">No items found</td></tr>
+                <tr><td colSpan={9} className="text-center py-12 text-gray-400">No items found</td></tr>
               ) : items.map(item => (
                 <tr key={item.id} className={`hover:bg-gray-50 ${item.currentStock <= item.lowStockThreshold ? 'bg-orange-50/30' : ''}`}>
                   <td className="px-4 py-3 text-sm font-medium text-gray-800">{item.name}</td>
@@ -214,6 +215,7 @@ export default function InventoryPage() {
                     {item.currentStock} <span className="font-normal text-gray-400 text-xs">{item.unit}</span>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">{item.lowStockThreshold}</td>
+                  <td className="px-4 py-3 text-xs text-gray-700">₦{Number(item.sellingPrice ?? 0).toLocaleString()}</td>
                   <td className="px-4 py-3"><StockBadge item={item} /></td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1.5 flex-wrap">
@@ -247,6 +249,7 @@ export default function InventoryPage() {
                 { label: 'Unit (e.g. bottles)',   key: 'unit',              type: 'text'   },
                 { label: 'Initial Stock',         key: 'currentStock',      type: 'number' },
                 { label: 'Low Stock Threshold',   key: 'lowStockThreshold', type: 'number' },
+                { label: 'Selling Price (₦)',      key: 'sellingPrice',      type: 'number' },
                 { label: 'Venue ID (optional)',   key: 'venueId',           type: 'text'   },
               ] as const).map(({ label, key, type }) => (
                 <div key={key}>

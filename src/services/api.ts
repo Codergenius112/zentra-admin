@@ -172,9 +172,8 @@ class ApiClient {
     assign: (id: string, waiterId: string) =>
       this.post<Order>(`/admin/orders/${id}/assign`, { waiterId }),
     manualPurchase: (data: {
-      bookingId: string;
-      items: Array<{ itemId?: string; name: string; quantity: number; price: number; specialInstructions?: string }>;
-      inventoryItemId?: string; inventoryQuantity?: number; inventoryReason?: string;
+      bookingId?: string; venueId?: string; eventId?: string;
+      items: Array<{ itemId: string; quantity: number; specialInstructions?: string }>;
     }) =>
       this.post<Order>('/admin/orders/manual-purchase', data),
   };
@@ -185,7 +184,7 @@ class ApiClient {
       this.get<PaginatedResponse<User>>('/admin/staff', { params }),
     get: (id: string) =>
       this.get<User>(`/admin/staff/${id}`),
-    add: (data: { email: string; firstName: string; lastName: string; role: string; phone?: string; password?: string; businessScopes?: string[] }) =>
+    add: (data: { email: string; firstName: string; lastName: string; role: string; phone?: string; password?: string }) =>
       this.post<User>('/admin/staff', data),
     updateRole: (id: string, role: string) =>
       this.patch<User>(`/admin/staff/${id}/role`, { role }),
@@ -217,6 +216,10 @@ class ApiClient {
   events = {
     list: (params?: { limit?: number; offset?: number; status?: string }) =>
       this.get<PaginatedResponse<Event>>('/events', { params }),
+    // Staff dashboard listing — scoped to the caller's own business.
+    // Public list() above is unscoped by design for customer browsing.
+    listMine: (params?: { limit?: number; offset?: number; status?: string }) =>
+      this.get<PaginatedResponse<Event>>('/events/mine', { params }),
     get: (id: string) =>
       this.get<Event>(`/events/${id}`),
     create: (data: Partial<Event>) =>
@@ -375,6 +378,11 @@ class ApiClient {
       this.get<PlatformSettings>('/super-admin/settings'),
     updateSettings: (data: Partial<Pick<PlatformSettings, 'serviceCharge' | 'commissionRate' | 'commissionPayer' | 'pushNotificationFee'>>) =>
       this.patch<PlatformSettings>('/super-admin/settings', data),
+    onboardBusinessOwner: (data: {
+      email: string; firstName: string; lastName: string;
+      phone?: string; password?: string; businessScopes: string[];
+    }) =>
+      this.post<User>('/super-admin/business-owners', data),
     listUsers: (params?: { limit?: number; offset?: number; role?: string; search?: string }) =>
       this.get<PaginatedResponse<User>>('/super-admin/users', { params }),
     updateScopes: (userId: string, scopes: BusinessScope[]) =>

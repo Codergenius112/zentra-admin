@@ -8,11 +8,9 @@ import type { User } from '@/types';
 import { UserRole, BusinessScope } from '@/types';
 
 const STAFF_ROLES = [
-  UserRole.WAITER, UserRole.KITCHEN_STAFF, UserRole.BAR_STAFF,
-  UserRole.DOOR_STAFF, UserRole.MANAGER, UserRole.ADMIN,
+  UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN_STAFF,
+  UserRole.BAR_STAFF, UserRole.DOOR_STAFF,
 ];
-
-const ADMIN_ROLES = [UserRole.ADMIN, UserRole.MANAGER];
 
 const ALL_SCOPES = [BusinessScope.CAR_RENTAL, BusinessScope.APARTMENT, BusinessScope.TABLE_CLUB, BusinessScope.EVENT_TICKETING];
 
@@ -70,17 +68,17 @@ export default function StaffPage() {
   const [search, setSearch]                 = useState('');
   const [roleFilter, setRoleFilter]         = useState('');
   const [showAdd, setShowAdd]               = useState(false);
-  const [showCreateAdmin, setShowCreateAdmin] = useState(false);
+  const [showOnboardOwner, setShowOnboardOwner] = useState(false);
   const [submitting, setSubmitting]         = useState(false);
   const [deactivating, setDeactivating]     = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null);
   const [form, setForm] = useState({
     email: '', firstName: '', lastName: '', phone: '',
-    role: UserRole.WAITER, password: '', businessScopes: [] as string[],
+    role: UserRole.WAITER, password: '',
   });
-  const [adminForm, setAdminForm] = useState({
+  const [ownerForm, setOwnerForm] = useState({
     email: '', firstName: '', lastName: '', phone: '',
-    role: UserRole.ADMIN, password: '', businessScopes: [] as string[],
+    password: '', businessScopes: [] as string[],
   });
 
   const fetchStaff = useCallback(async () => {
@@ -109,10 +107,9 @@ export default function StaffPage() {
         role: form.role,
         phone: form.phone || undefined,
         password: form.password || undefined,
-        businessScopes: form.businessScopes.length > 0 ? form.businessScopes : undefined,
       });
       setShowAdd(false);
-      setForm({ email: '', firstName: '', lastName: '', phone: '', role: UserRole.WAITER, password: '', businessScopes: [] });
+      setForm({ email: '', firstName: '', lastName: '', phone: '', role: UserRole.WAITER, password: '' });
       fetchStaff();
       addToast('Staff member added successfully', 'success');
     } catch (e: any) {
@@ -120,24 +117,27 @@ export default function StaffPage() {
     } finally { setSubmitting(false); }
   };
 
-  const handleCreateAdmin = async () => {
+  const handleOnboardOwner = async () => {
+    if (!ownerForm.businessScopes.length) {
+      addToast('Select at least one business scope for this owner', 'warning');
+      return;
+    }
     setSubmitting(true);
     try {
-      await apiClient.adminRegister({
-        email: adminForm.email,
-        firstName: adminForm.firstName,
-        lastName: adminForm.lastName,
-        phone: adminForm.phone || undefined,
-        role: adminForm.role,
-        password: adminForm.password,
-        businessScopes: adminForm.businessScopes.length > 0 ? adminForm.businessScopes : undefined,
+      await apiClient.superAdmin.onboardBusinessOwner({
+        email: ownerForm.email,
+        firstName: ownerForm.firstName,
+        lastName: ownerForm.lastName,
+        phone: ownerForm.phone || undefined,
+        password: ownerForm.password || undefined,
+        businessScopes: ownerForm.businessScopes,
       });
-      setShowCreateAdmin(false);
-      setAdminForm({ email: '', firstName: '', lastName: '', phone: '', role: UserRole.ADMIN, password: '', businessScopes: [] });
+      setShowOnboardOwner(false);
+      setOwnerForm({ email: '', firstName: '', lastName: '', phone: '', password: '', businessScopes: [] });
       fetchStaff();
-      addToast('Admin created successfully', 'success');
+      addToast('Business owner onboarded successfully', 'success');
     } catch (e: any) {
-      addToast(e?.response?.data?.message ?? 'Failed to create admin', 'error');
+      addToast(e?.response?.data?.message ?? 'Failed to onboard business owner', 'error');
     } finally { setSubmitting(false); }
   };
 
@@ -168,15 +168,17 @@ export default function StaffPage() {
         </div>
         <div className="flex gap-2">
           {isSuperAdmin && (
-            <button onClick={() => setShowCreateAdmin(true)}
+            <button onClick={() => setShowOnboardOwner(true)}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm">
-              + Create Admin
+              + Onboard Business Owner
             </button>
           )}
-          <button onClick={() => setShowAdd(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">
-            + Add Staff
-          </button>
+          {!isSuperAdmin && (
+            <button onClick={() => setShowAdd(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">
+              + Add Staff
+            </button>
+          )}
         </div>
       </div>
 
@@ -281,13 +283,9 @@ export default function StaffPage() {
                   {STAFF_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Business Scopes</label>
-                <ScopeCheckboxes
-                  selected={form.businessScopes}
-                  onChange={(scopes) => setForm(f => ({ ...f, businessScopes: scopes }))}
-                />
-              </div>
+              <p className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                This staff member automatically gets access to your business's scopes — there's nothing to pick here.
+              </p>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowAdd(false)}
                   className="flex-1 py-2 border rounded-lg text-sm font-medium text-gray-600">Cancel</button>
@@ -301,50 +299,47 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* Create Admin Modal (SUPER_ADMIN only) */}
-      {showCreateAdmin && (
+      {/* Onboard Business Owner Modal (SUPER_ADMIN only) */}
+      {showOnboardOwner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">Create Admin / Manager</h3>
-              <button onClick={() => setShowCreateAdmin(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+              <h3 className="text-lg font-semibold text-gray-800">Onboard Business Owner</h3>
+              <button onClick={() => setShowOnboardOwner(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
             <div className="p-6 space-y-3">
+              <p className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                This creates a new business on the platform. The owner logs in with the credentials below and gets
+                their own dashboard, scoped only to the business scopes you assign here.
+              </p>
               {([
                 { label: 'First Name', key: 'firstName', type: 'text' },
                 { label: 'Last Name',  key: 'lastName',  type: 'text' },
                 { label: 'Email',      key: 'email',     type: 'email' },
                 { label: 'Phone',      key: 'phone',     type: 'tel' },
-                { label: 'Password',   key: 'password',  type: 'password' },
+                { label: 'Temporary Password', key: 'password', type: 'password' },
               ] as const).map(({ label, key, type }) => (
                 <div key={key}>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
                   <input type={type}
                     className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    value={(adminForm as any)[key]}
-                    onChange={e => setAdminForm(f => ({ ...f, [key]: e.target.value }))} />
+                    value={(ownerForm as any)[key]}
+                    onChange={e => setOwnerForm(f => ({ ...f, [key]: e.target.value }))} />
                 </div>
               ))}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
-                <select className="w-full px-3 py-2 border rounded-lg text-sm"
-                  value={adminForm.role} onChange={e => setAdminForm(f => ({ ...f, role: e.target.value as UserRole }))}>
-                  {ADMIN_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Business Scopes</label>
                 <ScopeCheckboxes
-                  selected={adminForm.businessScopes}
-                  onChange={(scopes) => setAdminForm(f => ({ ...f, businessScopes: scopes }))}
+                  selected={ownerForm.businessScopes}
+                  onChange={(scopes) => setOwnerForm(f => ({ ...f, businessScopes: scopes }))}
                 />
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowCreateAdmin(false)}
+                <button onClick={() => setShowOnboardOwner(false)}
                   className="flex-1 py-2 border rounded-lg text-sm font-medium text-gray-600">Cancel</button>
-                <button onClick={handleCreateAdmin} disabled={submitting}
+                <button onClick={handleOnboardOwner} disabled={submitting}
                   className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                  {submitting ? 'Creating...' : 'Create Admin'}
+                  {submitting ? 'Onboarding...' : 'Onboard Owner'}
                 </button>
               </div>
             </div>

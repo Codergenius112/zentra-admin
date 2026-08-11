@@ -258,6 +258,7 @@ export interface InventoryItem {
   unit: string;
   currentStock: number;
   lowStockThreshold: number;
+  sellingPrice: number;
   venueId?: string;
   businessScope: BusinessScope;
   createdAt: string;
@@ -328,6 +329,7 @@ export interface AuditLog {
   id: string;
   actionType: string;
   actorId: string;
+  actorName?: string | null;
   actorRole?: string;
   resourceType?: string;
   resourceId?: string;

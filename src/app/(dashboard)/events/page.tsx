@@ -51,7 +51,7 @@ export default function EventsPage() {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const res = await apiClient.events.list({ limit: 50 }) as any;
+      const res = await apiClient.events.listMine({ limit: 50 }) as any;
       const payload = res.data ?? res; // unwrap interceptor { data: { events, total } }
       setEvents(payload.events ?? payload.data ?? []);
       setTotal(payload.total ?? (payload.events ?? payload.data ?? []).length);
