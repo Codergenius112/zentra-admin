@@ -66,6 +66,10 @@ export default function ApartmentsPage() {
       addToast('Please fill in name, address, city, and price.', 'warning');
       return;
     }
+    if (imageUrls.length === 0) {
+      addToast('Upload at least one image before creating a listing', 'warning');
+      return;
+    }
     setSaving(true);
     try {
       await apiClient.apartments.createListing({

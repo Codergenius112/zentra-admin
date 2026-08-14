@@ -60,6 +60,10 @@ export default function CarsPage() {
       addToast('Please fill in make, model, year, price, and city.', 'warning');
       return;
     }
+    if (imageUrls.length === 0) {
+      addToast('Upload at least one image before creating a listing', 'warning');
+      return;
+    }
     setSaving(true);
     try {
       await apiClient.cars.createListing({

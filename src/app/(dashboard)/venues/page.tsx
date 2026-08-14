@@ -67,6 +67,10 @@ export default function VenuesPage() {
   };
 
   const handleCreate = async () => {
+    if (mediaUrls.length === 0) {
+      addToast('Upload at least one image before creating a venue', 'warning');
+      return;
+    }
     setSubmitting(true);
     try {
       await apiClient.venues.create({

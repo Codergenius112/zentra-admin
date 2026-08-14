@@ -81,6 +81,10 @@ export default function EventsPage() {
       addToast('End date must be after start date', 'warning');
       return;
     }
+    if (mediaUrls.length === 0) {
+      addToast('Upload at least one image before creating an event', 'warning');
+      return;
+    }
     setSubmitting(true);
     try {
       const eventData = {
