@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '@/services/api';
 import type { Order, Venue } from '@/types';
-import { OrderStatus } from '@/types';
+import { OrderStatus, UserRole } from '@/types';
 import MediaUpload from '@/components/MediaUpload';
 import useUIStore from '@/store/ui.store';
+import useAuthStore from '@/store/auth.store';
 
 const STATUS_COLORS: Record<string, string> = {
   CREATED:        'bg-gray-100 text-gray-700',
@@ -107,6 +108,8 @@ function OrderCard({ order, onUpdate, onAssign }: {
 }
 
 export default function OrdersPage() {
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const addToast = useUIStore(s => s.addToast);
   const [tab, setTab]               = useState<'live' | 'all' | 'menu'>('live');
   const [liveOrders, setLiveOrders] = useState<Order[]>([]);
@@ -359,10 +362,12 @@ export default function OrdersPage() {
               Auto-refresh (8s)
             </label>
           )}
-          <button onClick={openManualPurchase}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition">
-            + Manual Purchase
-          </button>
+          {!isSuperAdmin && (
+            <button onClick={openManualPurchase}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition">
+              + Manual Purchase
+            </button>
+          )}
           {(['live', 'all', 'menu'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${

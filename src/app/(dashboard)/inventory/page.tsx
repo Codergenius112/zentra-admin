@@ -87,6 +87,90 @@ function HistoryDrawer({ item, onClose }: { item: InventoryItem; onClose: () => 
   );
 }
 
+function EditModal({ item, onClose, onSaved }: { item: InventoryItem; onClose: () => void; onSaved: () => void }) {
+  const addToast = useUIStore(s => s.addToast);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    name: item.name,
+    unit: item.unit,
+    currentStock: String(item.currentStock),
+    lowStockThreshold: String(item.lowStockThreshold),
+    sellingPrice: String(item.sellingPrice ?? 0),
+  });
+
+  const handleSave = async () => {
+    setSubmitting(true);
+    try {
+      await apiClient.inventory.update(item.id, {
+        name: form.name,
+        unit: form.unit,
+        currentStock: Number(form.currentStock),
+        lowStockThreshold: Number(form.lowStockThreshold),
+        sellingPrice: Number(form.sellingPrice),
+      });
+      addToast('Item updated', 'success');
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      addToast(e?.response?.data?.message ?? 'Failed to update item', 'error');
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-lg font-semibold text-gray-800">Edit Item · {item.sku}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <div className="p-6 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Item Name</label>
+            <input type="text"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Unit (e.g. bottles)</label>
+            <input type="text"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Current Stock</label>
+            <input type="number"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={form.currentStock} onChange={e => setForm(f => ({ ...f, currentStock: e.target.value }))} />
+            <p className="text-xs text-gray-400 mt-1">
+              Prefer using +Restock / −Deduct for normal stock changes — this field is for direct corrections only, and will be logged as such.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Low Stock Threshold</label>
+            <input type="number"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={form.lowStockThreshold} onChange={e => setForm(f => ({ ...f, lowStockThreshold: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Selling Price (₦)</label>
+            <input type="number"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button onClick={onClose}
+              className="flex-1 py-2 border rounded-lg text-sm font-medium text-gray-600">Cancel</button>
+            <button onClick={handleSave} disabled={submitting}
+              className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+              {submitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function InventoryPage() {
   const addToast = useUIStore(s => s.addToast);
   const [items, setItems]           = useState<InventoryItem[]>([]);
@@ -97,6 +181,7 @@ export default function InventoryPage() {
   const [showCreate, setShowCreate]     = useState(false);
   const [actionModal, setActionModal]   = useState<{ item: InventoryItem; type: 'restock' | 'deduct' } | null>(null);
   const [historyItem, setHistoryItem]   = useState<InventoryItem | null>(null);
+  const [editItem, setEditItem]         = useState<InventoryItem | null>(null);
   const [quantity, setQuantity]         = useState('');
   const [reason, setReason]             = useState('');
   const [submitting, setSubmitting]     = useState(false);
@@ -225,6 +310,8 @@ export default function InventoryPage() {
                         className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 font-medium">−</button>
                       <button onClick={() => setHistoryItem(item)}
                         className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 font-medium">History</button>
+                      <button onClick={() => setEditItem(item)}
+                        className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-medium">Edit</button>
                     </div>
                   </td>
                 </tr>
@@ -324,6 +411,13 @@ export default function InventoryPage() {
       )}
 
       {historyItem && <HistoryDrawer item={historyItem} onClose={() => setHistoryItem(null)} />}
+      {editItem && (
+        <EditModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSaved={fetchItems}
+        />
+      )}
     </div>
   );
 }

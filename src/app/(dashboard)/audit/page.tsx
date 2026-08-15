@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/services/api';
 import type { AuditLog } from '@/types';
+import { UserRole } from '@/types';
+import useAuthStore from '@/store/auth.store';
 
 const RESOURCE_TYPES = ['booking','user','order','payment','inventory_item','platform_settings','notification_campaign'];
 const ACTION_TYPES = [
@@ -11,15 +13,15 @@ const ACTION_TYPES = [
   'ORDER_CREATED','ORDER_ASSIGNED','ORDER_COMPLETED',
   'USER_CREATED','USER_UPDATED','STAFF_DEACTIVATED','STAFF_SCOPE_UPDATED',
   'TICKET_SCANNED','SETTINGS_UPDATED','CAMPAIGN_SENT',
-  'INVENTORY_RESTOCKED','INVENTORY_DEDUCTED',
+  'INVENTORY_RESTOCKED','INVENTORY_DEDUCTED','INVENTORY_ITEM_CREATED','INVENTORY_ITEM_UPDATED',
   'CAUTION_FEE_REFUNDED','CAUTION_FEE_FORFEITED','ADMIN_OVERRIDE',
 ];
 
 function exportCSV(logs: AuditLog[]) {
-  const headers = ['ID','Action','Actor','Resource Type','Resource ID','IP','Timestamp'];
+  const headers = ['ID','Action','Actor','Resource Type','Resource Name','Resource ID','IP','Timestamp'];
   const rows    = logs.map(l => [
     l.id, l.actionType, l.actorId,
-    l.resourceType ?? '', l.resourceId ?? '',
+    l.resourceType ?? '', l.resourceName ?? '', l.resourceId ?? '',
     l.ipAddress ?? '', new Date(l.timestamp).toISOString(),
   ]);
   const csv  = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
@@ -47,6 +49,8 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function AuditPage() {
+  const user = useAuthStore((s) => s.user);
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const [logs, setLogs]           = useState<AuditLog[]>([]);
   const [total, setTotal]         = useState(0);
   const [loading, setLoading]     = useState(true);
@@ -62,14 +66,16 @@ export default function AuditPage() {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.superAdmin.getAuditLogs({
-        limit:  LIMIT,
-        offset: page * LIMIT,
-        action:       actionFilter       || undefined,
-        resourceType: resourceTypeFilter || undefined,
-        startDate:    startDate          || undefined,
-        endDate:      endDate            || undefined,
-      }) as any;
+      const res = isSuperAdmin
+        ? await apiClient.superAdmin.getAuditLogs({
+            limit:  LIMIT,
+            offset: page * LIMIT,
+            action:       actionFilter       || undefined,
+            resourceType: resourceTypeFilter || undefined,
+            startDate:    startDate          || undefined,
+            endDate:      endDate            || undefined,
+          }) as any
+        : await apiClient.audit.listMyBusiness({ limit: LIMIT, offset: page * LIMIT }) as any;
       setLogs(res.data?.data ?? res.data ?? []);
       setTotal(res.data?.total ?? res.total ?? 0);
     } catch (e) { console.error(e); }
@@ -163,6 +169,7 @@ export default function AuditPage() {
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">
                         {log.resourceType && <div className="font-medium">{log.resourceType}</div>}
+                        {log.resourceName && <div className="text-gray-700">{log.resourceName}</div>}
                         {log.resourceId && <div className="font-mono text-gray-400">{log.resourceId.slice(0, 8)}...</div>}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{log.ipAddress ?? '—'}</td>

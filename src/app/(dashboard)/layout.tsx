@@ -28,7 +28,7 @@ const navItemsData = [
   { label: 'Cars', href: '/cars', icon: '🚗', scopes: [BusinessScope.CAR_RENTAL] },
   { label: 'Campaigns', href: '/campaigns', icon: '📣', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
   { label: 'Platform Settings', href: '/platform-settings', icon: '⚙️', roles: [UserRole.SUPER_ADMIN] },
-  { label: 'Audit Log', href: '/audit', icon: '🔍', roles: [UserRole.SUPER_ADMIN] },
+  { label: 'Audit Log', href: '/audit', icon: '🔍', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
 ];
 
 export default function DashboardLayout({

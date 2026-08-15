@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { User } from '@/types';
 import { apiClient } from '@/services/api';
+import { queryClient } from '@/components/providers/query-provider';
 
 interface AuthState {
   user: User | null;
@@ -30,6 +31,10 @@ const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const res = await apiClient.login(email, password);
+          // Defense-in-depth: also clear here, not just on logout, in case
+          // the previous session ended without a clean logout (browser
+          // closed, token expired) and stale cache is still sitting around.
+          queryClient.clear();
           set({
             user: res.user,
             isAuthenticated: true,
@@ -56,6 +61,10 @@ const useAuthStore = create<AuthState>()(
         } catch {
           // ignore
         } finally {
+          // Wipe every cached query — otherwise the next user to log in on
+          // this same browser tab can briefly see the previous user's
+          // cached dashboard/orders/etc. data before the fresh fetch lands.
+          queryClient.clear();
           set({
             user: null,
             isAuthenticated: false,

@@ -333,6 +333,7 @@ export interface AuditLog {
   actorRole?: string;
   resourceType?: string;
   resourceId?: string;
+  resourceName?: string | null;
   changes?: Record<string, any>;
   ipAddress?: string;
   timestamp: string;

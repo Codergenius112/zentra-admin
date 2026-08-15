@@ -210,6 +210,9 @@ class ApiClient {
   audit = {
     list: (params?: { limit?: number; offset?: number; action?: string; resourceType?: string; startDate?: string; endDate?: string }) =>
       this.get<PaginatedResponse<AuditLog>>('/super-admin/audit-logs', { params }),
+    // Business-scoped: caller's own actions + their staff's. For admin/manager.
+    listMyBusiness: (params?: { limit?: number; offset?: number }) =>
+      this.get<PaginatedResponse<AuditLog>>('/admin/audit-logs', { params }),
   };
 
   // ─── Events ────────────────────────────────────────────────────────────────
@@ -330,6 +333,7 @@ class ApiClient {
       this.get<any[]>(`/inventory/items/${id}/history`),
     alerts: (businessScope?: BusinessScope) =>
       this.get<InventoryItem[]>('/inventory/alerts', { params: { businessScope } }),
+    
   };
 
   // ─── Menu Items ──────────────────────────────────────────────────────────────
