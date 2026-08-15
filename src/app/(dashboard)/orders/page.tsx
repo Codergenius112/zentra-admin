@@ -254,7 +254,7 @@ export default function OrdersPage() {
         apiClient.tables.bookings({}) as any,
         apiClient.inventory.list({ limit: 200 }) as any,
         apiClient.venues.list({ limit: 100 }) as any,
-        apiClient.events.list({ limit: 100 }) as any,
+        apiClient.events.listMine({ limit: 100 }) as any,
       ]);
       const bookings = bookingsRes.data?.data ?? bookingsRes.data ?? [];
       setActiveBookings(
@@ -268,7 +268,10 @@ export default function OrdersPage() {
       );
       setInventoryItems(inventoryRes.data?.data ?? inventoryRes.data ?? []);
       setVenues(venuesRes.data?.data ?? venuesRes.data ?? []);
-      setEvents(eventsRes.data?.data ?? eventsRes.data ?? []);
+      // /events/mine returns { events, total } — not { data, total } like
+      // most other list endpoints, so it needs its own unwrap path.
+      const eventsPayload = eventsRes.data ?? eventsRes;
+      setEvents(eventsPayload.events ?? eventsPayload.data ?? []);
     } catch (e) { console.error(e); }
   };
 
