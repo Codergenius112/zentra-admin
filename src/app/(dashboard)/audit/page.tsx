@@ -20,7 +20,7 @@ const ACTION_TYPES = [
 function exportCSV(logs: AuditLog[]) {
   const headers = ['ID','Action','Actor','Resource Type','Resource Name','Resource ID','IP','Timestamp'];
   const rows    = logs.map(l => [
-    l.id, l.actionType, l.actorId,
+    l.id, l.actionType, l.actorName || l.actorId,
     l.resourceType ?? '', l.resourceName ?? '', l.resourceId ?? '',
     l.ipAddress ?? '', new Date(l.timestamp).toISOString(),
   ]);
