@@ -161,7 +161,7 @@ class ApiClient {
 
   // ─── Orders ────────────────────────────────────────────────────────────────
   orders = {
-    list: (params?: { limit?: number; offset?: number; status?: string }) =>
+    list: (params?: { limit?: number; offset?: number; status?: string; startDate?: string; endDate?: string }) =>
       this.get<PaginatedResponse<Order>>('/admin/orders', { params }),
     live: () =>
       this.get<Order[]>('/admin/orders/live'),

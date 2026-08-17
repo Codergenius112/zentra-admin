@@ -28,6 +28,32 @@ const NEXT_STATUS: Record<string, string> = {
   SERVED:         'COMPLETED',
 };
 
+function exportOrdersCSV(orders: Order[]) {
+  const headers = ['Order ID','Item Name','Quantity','Item Price','Line Total','Order Status','Order Total','Created At'];
+  const rows: (string | number)[][] = [];
+  orders.forEach(o => {
+    if (o.items?.length) {
+      o.items.forEach(item => {
+        rows.push([
+          o.id, item.name, item.quantity, item.price,
+          Number(item.price) * Number(item.quantity),
+          o.status, o.totalAmount, new Date(o.createdAt).toISOString(),
+        ]);
+      });
+    } else {
+      rows.push([o.id, '', '', '', '', o.status, o.totalAmount, new Date(o.createdAt).toISOString()]);
+    }
+  });
+  const csv  = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function OrderCard({ order, onUpdate, onAssign }: {
   order: Order;
   onUpdate: (id: string, status: string) => void;
@@ -53,7 +79,6 @@ function OrderCard({ order, onUpdate, onAssign }: {
         </span>
       </div>
 
-      {/* Location Info */}
       {order.tableInfo && (
         <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="text-xs font-medium text-blue-900">
@@ -118,6 +143,8 @@ export default function OrdersPage() {
   const [loading, setLoading]       = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [startDate, setStartDate]   = useState('');
+  const [endDate, setEndDate]       = useState('');
   const [assignModal, setAssignModal]   = useState<Order | null>(null);
   const [waiterId, setWaiterId]         = useState('');
   const [assigning, setAssigning]       = useState(false);
@@ -162,12 +189,14 @@ export default function OrdersPage() {
       const res = await apiClient.orders.list({
         limit: 100,
         status: statusFilter || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
       }) as any;
       setAllOrders(res.data?.data ?? res.orders ?? res.data ?? []);
       setTotal(res.data?.total ?? res.total ?? 0);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [statusFilter]);
+  }, [statusFilter, startDate, endDate]);
 
   useEffect(() => {
     if (tab === 'live') {
@@ -268,8 +297,6 @@ export default function OrdersPage() {
       );
       setInventoryItems(inventoryRes.data?.data ?? inventoryRes.data ?? []);
       setVenues(venuesRes.data?.data ?? venuesRes.data ?? []);
-      // /events/mine returns { events, total } — not { data, total } like
-      // most other list endpoints, so it needs its own unwrap path.
       const eventsPayload = eventsRes.data ?? eventsRes;
       setEvents(eventsPayload.events ?? eventsPayload.data ?? []);
     } catch (e) { console.error(e); }
@@ -389,18 +416,40 @@ export default function OrdersPage() {
       </div>
 
       {tab === 'all' && (
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           <select className="px-3 py-2 border rounded-lg text-sm"
             value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All Statuses</option>
             {Object.values(OrderStatus).map(s => <option key={s} value={s}>{s}</option>)}
           </select>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">From</label>
+            <input type="date" className="px-3 py-2 border rounded-lg text-sm"
+              value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">To</label>
+            <input type="date" className="px-3 py-2 border rounded-lg text-sm"
+              value={endDate} onChange={e => setEndDate(e.target.value)} />
+          </div>
+          {(startDate || endDate) && (
+            <button onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="px-3 py-2 text-sm text-red-600 hover:text-red-800 font-medium">
+              Clear Dates
+            </button>
+          )}
+          <button
+            onClick={() => exportOrdersCSV(allOrders)}
+            disabled={allOrders.length === 0}
+            className="ml-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-40"
+          >
+            ⬇ Export CSV
+          </button>
         </div>
       )}
 
       {tab === 'menu' ? (
         <div>
-          {/* Venue selector */}
           <div className="mb-4 flex items-center gap-3">
             <label className="text-sm text-gray-600 font-medium">Venue:</label>
             <select className="px-3 py-2 border rounded-lg text-sm" value={selectedVenue}
@@ -409,7 +458,6 @@ export default function OrdersPage() {
               {venues.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
-          {/* Menu items grid */}
           {menuLoading ? (
             <div className="text-center py-20 text-gray-500">Loading menu...</div>
           ) : menuItems.length === 0 ? (
@@ -503,7 +551,6 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Add Menu Item Modal */}
       {showAddMenu && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
