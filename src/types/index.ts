@@ -44,6 +44,21 @@ export enum BusinessScope {
   EVENT_TICKETING = 'EVENT_TICKETING',
 }
 
+// ← NEW (multi-tenancy)
+export enum BusinessStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  SUSPENDED = 'SUSPENDED',
+  REJECTED = 'REJECTED',
+}
+
+// ← NEW (multi-tenancy)
+export enum BusinessShareDataType {
+  INVENTORY = 'INVENTORY',
+  ANALYTICS = 'ANALYTICS',
+  CUSTOMER_DIRECTORY = 'CUSTOMER_DIRECTORY',
+}
+
 export enum OrderStatus {
   CREATED = 'CREATED',
   ASSIGNED = 'ASSIGNED',
@@ -69,6 +84,49 @@ export interface User {
   lastLoginAt?: string;
   createdAt: string;
   updatedAt: string;
+  // ← NEW (multi-tenancy) — present on GET /admin/staff/:id responses only
+  // (the full staff-detail view), not on the plain staff list.
+  assignments?: StaffBusinessAssignment[];
+}
+
+// ← NEW (multi-tenancy)
+export interface Business {
+  id: string;
+  ownerId: string;
+  name: string;
+  businessScopes: BusinessScope[];
+  status: BusinessStatus;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Present on GET /admin/businesses responses — true if the caller owns
+  // this business (as opposed to merely being staff assigned to it).
+  isOwner?: boolean;
+}
+
+// ← NEW (multi-tenancy)
+export interface StaffBusinessAssignment {
+  id: string;
+  userId: string;
+  businessId: string;
+  role: UserRole;
+  scopes: BusinessScope[] | null;
+  assignedBy: string;
+  assignedAt: string;
+  revokedAt?: string | null;
+  revokedBy?: string | null;
+}
+
+// ← NEW (Phase 5)
+export interface BusinessDataShare {
+  id: string;
+  fromBusinessId: string;
+  toBusinessId: string;
+  dataTypes: BusinessShareDataType[];
+  grantedBy: string;
+  createdAt: string;
+  revokedAt?: string | null;
+  revokedBy?: string | null;
 }
 
 export interface AuthResponse {
@@ -82,6 +140,7 @@ export interface AuthResponse {
 export interface Booking {
   id: string;
   bookingType: BookingType;
+  businessId?: string | null; // ← NEW (multi-tenancy)
   userId: string;
   user?: Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>;
   resourceId: string;
@@ -117,6 +176,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  businessId?: string | null; // ← NEW (multi-tenancy)
   bookingId: string;
   userId: string;
   status: OrderStatus;
@@ -139,6 +199,7 @@ export interface Order {
 
 export interface Event {
   id: string;
+  businessId?: string | null; // ← NEW (multi-tenancy)
   name: string;
   description: string;
   venueId?: string;
@@ -172,6 +233,7 @@ export interface TicketType {
 
 export interface Venue {
   id: string;
+  businessId?: string | null; // ← NEW (multi-tenancy)
   name: string;
   address: string;
   city: string;
@@ -202,6 +264,7 @@ export interface Venue {
 
 export interface ApartmentListing {
   id: string;
+  businessId?: string | null; // ← NEW (multi-tenancy)
   name: string;
   description: string;
   address: string;
@@ -224,6 +287,7 @@ export interface ApartmentListing {
 
 export interface CarListing {
   id: string;
+  businessId?: string | null; // ← NEW (multi-tenancy)
   make: string;
   model: string;
   year: number;
@@ -252,6 +316,7 @@ export interface CarListing {
 
 export interface InventoryItem {
   id: string;
+  businessId?: string | null; // ← NEW (multi-tenancy)
   name: string;
   sku: string;
   category: string;

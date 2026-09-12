@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/services/api';
 import useAuthStore from '@/store/auth.store';
+import useBusinessStore from '@/store/business.store';
 import useUIStore from '@/store/ui.store';
-import type { User } from '@/types';
+import type { User, StaffBusinessAssignment } from '@/types';
 import { UserRole, BusinessScope } from '@/types';
 
 const STAFF_ROLES = [
@@ -57,6 +58,199 @@ function ScopeCheckboxes({ selected, onChange }: { selected: string[]; onChange:
   );
 }
 
+// ← NEW (multi-tenancy) — per-staff-member business assignment management:
+// view every business they're currently assigned to (with its own role),
+// change a specific assignment's role, revoke one assignment without
+// touching the others, or assign them to a further business the caller owns.
+function AssignmentsModal({
+  member, onClose, onChanged,
+}: {
+  member: User;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const addToast = useUIStore(s => s.addToast);
+  const { businesses } = useBusinessStore();
+
+  const [detail, setDetail] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showAssign, setShowAssign] = useState(false);
+  const [assignForm, setAssignForm] = useState({ businessId: '', role: UserRole.WAITER as string });
+  const [submitting, setSubmitting] = useState(false);
+  const [revokingBusinessId, setRevokingBusinessId] = useState<string | null>(null);
+  const [savingRoleFor, setSavingRoleFor] = useState<string | null>(null);
+
+  const fetchDetail = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.staff.get(member.id) as any;
+      setDetail(res.data ?? res);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, [member.id]);
+
+  useEffect(() => { fetchDetail(); }, [fetchDetail]);
+
+  const assignments: StaffBusinessAssignment[] = (detail?.assignments ?? []).filter(a => !a.revokedAt);
+  const assignedBusinessIds = new Set(assignments.map(a => a.businessId));
+  // Only the caller's OWNED businesses can be granted here — matches the
+  // backend, which requires ownership (not just staff access) to assign.
+  const ownedBusinesses = businesses.filter(b => b.isOwner && !assignedBusinessIds.has(b.id));
+
+  const businessName = (id: string) => businesses.find(b => b.id === id)?.name ?? id.slice(0, 8);
+
+  const refresh = async () => {
+    await fetchDetail();
+    onChanged();
+  };
+
+  const handleAssign = async () => {
+    if (!assignForm.businessId) {
+      addToast('Select a business', 'warning');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiClient.staff.assignToBusiness(member.id, {
+        businessId: assignForm.businessId,
+        role: assignForm.role,
+      });
+      setShowAssign(false);
+      setAssignForm({ businessId: '', role: UserRole.WAITER });
+      await refresh();
+      addToast('Assigned to business', 'success');
+    } catch (e: any) {
+      addToast(e?.response?.data?.message ?? 'Failed to assign', 'error');
+    } finally { setSubmitting(false); }
+  };
+
+  const handleRevoke = async (businessId: string) => {
+    setRevokingBusinessId(businessId);
+    try {
+      await apiClient.staff.revokeAssignment(member.id, businessId);
+      await refresh();
+      addToast('Assignment revoked', 'success');
+    } catch (e: any) {
+      addToast(e?.response?.data?.message ?? 'Failed to revoke assignment', 'error');
+    } finally { setRevokingBusinessId(null); }
+  };
+
+  const handleRoleChange = async (businessId: string, newRole: string) => {
+    setSavingRoleFor(businessId);
+    try {
+      const res = await apiClient.staff.updateRole(member.id, newRole, businessId) as any;
+      await refresh();
+      const body = res.data ?? res;
+      if (body?.globalRoleUpdated === false) {
+        addToast(
+          `Role updated for this business only — ${member.firstName} has other active assignments, so their platform-wide role wasn't changed.`,
+          'info',
+          5000,
+        );
+      } else {
+        addToast('Role updated', 'success');
+      }
+    } catch (e: any) {
+      addToast(e?.response?.data?.message ?? 'Failed to update role', 'error');
+    } finally { setSavingRoleFor(null); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">{member.firstName} {member.lastName}</h3>
+            <p className="text-xs text-gray-500">Business assignments</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {loading ? (
+            <div className="text-center py-8 text-gray-400 text-sm">Loading...</div>
+          ) : assignments.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">No active business assignments</div>
+          ) : (
+            <div className="space-y-2">
+              {assignments.map((a) => (
+                <div key={a.id} className="flex items-center justify-between border rounded-lg px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-gray-800 truncate">{businessName(a.businessId)}</div>
+                    <div className="text-xs text-gray-400">
+                      Assigned {new Date(a.assignedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      className="text-xs border rounded px-2 py-1"
+                      value={a.role}
+                      disabled={savingRoleFor === a.businessId}
+                      onChange={(e) => handleRoleChange(a.businessId, e.target.value)}
+                    >
+                      {STAFF_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <button
+                      onClick={() => handleRevoke(a.businessId)}
+                      disabled={revokingBusinessId === a.businessId}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
+                    >
+                      {revokingBusinessId === a.businessId ? '...' : 'Revoke'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!showAssign ? (
+            ownedBusinesses.length > 0 && (
+              <button
+                onClick={() => setShowAssign(true)}
+                className="w-full py-2 border-2 border-dashed rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600"
+              >
+                + Assign to another business
+              </button>
+            )
+          ) : (
+            <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Business</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  value={assignForm.businessId}
+                  onChange={(e) => setAssignForm(f => ({ ...f, businessId: e.target.value }))}
+                >
+                  <option value="">Select a business...</option>
+                  {ownedBusinesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Role at this business</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  value={assignForm.role}
+                  onChange={(e) => setAssignForm(f => ({ ...f, role: e.target.value }))}
+                >
+                  {STAFF_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setShowAssign(false)}
+                  className="flex-1 py-1.5 border rounded-lg text-xs font-medium text-gray-600">Cancel</button>
+                <button onClick={handleAssign} disabled={submitting}
+                  className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium disabled:opacity-50">
+                  {submitting ? 'Assigning...' : 'Assign'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function StaffPage() {
   const { user: currentUser } = useAuthStore();
   const addToast = useUIStore(s => s.addToast);
@@ -72,6 +266,7 @@ export default function StaffPage() {
   const [submitting, setSubmitting]         = useState(false);
   const [deactivating, setDeactivating]     = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null);
+  const [managingAssignments, setManagingAssignments] = useState<User | null>(null); // ← NEW (multi-tenancy)
   const [form, setForm] = useState({
     email: '', firstName: '', lastName: '', phone: '',
     role: UserRole.WAITER, password: '',
@@ -238,12 +433,20 @@ export default function StaffPage() {
                     {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleDateString() : 'Never'}
                   </td>
                   <td className="px-4 py-3">
-                    {member.isActive && member.role !== UserRole.SUPER_ADMIN && (
-                      <button onClick={() => setConfirmDeactivate(member)}
-                        className="text-xs text-red-500 hover:text-red-700 font-medium">
-                        Deactivate
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {member.role !== UserRole.SUPER_ADMIN && (
+                        <button onClick={() => setManagingAssignments(member)}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                          Businesses
+                        </button>
+                      )}
+                      {member.isActive && member.role !== UserRole.SUPER_ADMIN && (
+                        <button onClick={() => setConfirmDeactivate(member)}
+                          className="text-xs text-red-500 hover:text-red-700 font-medium">
+                          Deactivate
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -345,6 +548,14 @@ export default function StaffPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {managingAssignments && (
+        <AssignmentsModal
+          member={managingAssignments}
+          onClose={() => setManagingAssignments(null)}
+          onChanged={fetchStaff}
+        />
       )}
 
       {confirmDeactivate && (

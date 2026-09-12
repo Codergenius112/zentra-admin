@@ -1,9 +1,11 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import useAuthStore from '@/store/auth.store';
+import useBusinessStore from '@/store/business.store';
+import { BusinessSwitcher } from '@/components/BusinessSwitcher';
 import { UserRole, BusinessScope } from '@/types';
 
 const ALL_ADMIN_ROLES = [
@@ -28,6 +30,9 @@ const navItemsData = [
   { label: 'Cars', href: '/cars', icon: '🚗', scopes: [BusinessScope.CAR_RENTAL] },
   { label: 'Campaigns', href: '/campaigns', icon: '📣', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
   { label: 'Platform Settings', href: '/platform-settings', icon: '⚙️', roles: [UserRole.SUPER_ADMIN] },
+  { label: 'Data Sharing', href: '/data-sharing', icon: '🔗', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] }, // ← NEW (Phase 5 UI)
+  { label: 'Businesses', href: '/businesses', icon: '🏬', roles: [UserRole.SUPER_ADMIN] }, // ← NEW (business approval/suspension UI)
+  { label: 'Business Settings', href: '/business-settings', icon: '🏢', roles: [UserRole.ADMIN] }, // ← NEW (owner-facing business settings)
   { label: 'Audit Log', href: '/audit', icon: '🔍', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
 ];
 
@@ -42,6 +47,16 @@ export default function DashboardLayout({
     user: state.user,
     logout: state.logout,
   }));
+
+  const { loaded: businessesLoaded, fetchBusinesses } = useBusinessStore();
+
+  // Safety net: if this layout mounts before the auth store's login/
+  // restoreSession calls have kicked off the business fetch (e.g. a hard
+  // refresh landing directly on a dashboard route), make sure it still
+  // happens rather than leaving the switcher permanently empty.
+  useEffect(() => {
+    if (user && !businessesLoaded) fetchBusinesses();
+  }, [user, businessesLoaded, fetchBusinesses]);
 
   const handleLogout = async () => {
     await logout();
@@ -83,6 +98,8 @@ export default function DashboardLayout({
           <h1 className="text-2xl font-bold">D&apos;LIFESTYLE</h1>
           <p className="text-blue-200 text-sm">Admin Portal</p>
         </div>
+
+        <BusinessSwitcher />
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {visibleItems.map((item) => (

@@ -4,7 +4,7 @@ import type {
   Booking, Order, AuditLog, DashboardMetrics, PlatformSettings,
   ApartmentListing, CarListing, Event, TicketType, Venue,
   InventoryItem, NotificationCampaign, CampaignTier, User, BusinessScope, PaginatedResponse,
-  AuthResponse,
+  AuthResponse, Business, BusinessDataShare, BusinessShareDataType, StaffBusinessAssignment,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL //|| 'http://localhost:3000';
@@ -15,6 +15,17 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL //|| 'http://localhost:3000';
 // behind HTTPS.
 const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
 const COOKIE_OPTIONS = { secure: isHttps, sameSite: isHttps ? ('strict' as const) : ('lax' as const) };
+
+// ← NEW (multi-tenancy) — the currently-selected business, read fresh on
+// every request rather than captured once, since the picker can change it
+// mid-session without a page reload. Kept out of the zustand store import
+// here deliberately (avoids a store→api→store circular import); the
+// business store writes here directly instead of the api client reading
+// from the store.
+let activeBusinessId: string | null = null;
+export function setActiveBusinessIdForRequests(id: string | null) {
+  activeBusinessId = id;
+}
 
 class ApiClient {
   private axiosInstance: AxiosInstance;
@@ -30,6 +41,9 @@ class ApiClient {
     this.axiosInstance.interceptors.request.use((config) => {
       const token = Cookies.get('accessToken');
       if (token) config.headers.Authorization = `Bearer ${token}`;
+      // ← NEW (multi-tenancy) — tells TenantScopeGuard which business this
+      // request is acting within, when the caller has more than one.
+      if (activeBusinessId) config.headers['X-Business-Id'] = activeBusinessId;
       return config;
     });
 
@@ -186,10 +200,43 @@ class ApiClient {
       this.get<User>(`/admin/staff/${id}`),
     add: (data: { email: string; firstName: string; lastName: string; role: string; phone?: string; password?: string }) =>
       this.post<User>('/admin/staff', data),
-    updateRole: (id: string, role: string) =>
-      this.patch<User>(`/admin/staff/${id}/role`, { role }),
+    // ← CHANGED (multi-tenancy) — role updates now apply to one specific
+    // business assignment. Omit businessId for the common single-business
+    // case (the backend defaults to the caller's sole active business).
+    updateRole: (id: string, role: string, businessId?: string) =>
+      this.patch<{ message: string; businessId: string; role: string; globalRoleUpdated: boolean }>(
+        `/admin/staff/${id}/role`, { role, businessId },
+      ),
     deactivate: (id: string) =>
       this.delete<void>(`/admin/staff/${id}`),
+    // ← NEW (multi-tenancy) — assign an existing staff member to one of the
+    // caller's OTHER businesses, and revoke that specific assignment later.
+    assignToBusiness: (id: string, data: { businessId: string; role: string; scopes?: BusinessScope[] }) =>
+      this.post<StaffBusinessAssignment>(`/admin/staff/${id}/assignments`, data),
+    revokeAssignment: (id: string, businessId: string) =>
+      this.delete<{ message: string }>(`/admin/staff/${id}/assignments/${businessId}`),
+  };
+
+  // ─── Businesses (multi-tenancy) ─────────────────────────────────────────────
+  businesses = {
+    // Every business the caller can act within — owned + assigned-to.
+    // Powers the business switcher.
+    list: () =>
+      this.get<Business[]>('/admin/businesses'),
+    // ← NEW (owner-facing business settings) — name/payoutDetails/isActive
+    // only. Scopes and status stay super-admin-only (see superAdmin.*).
+    update: (id: string, data: { name?: string; payoutDetails?: Record<string, any>; isActive?: boolean }) =>
+      this.patch<Business>(`/admin/businesses/${id}`, data),
+  };
+
+  // ─── Business Data Sharing (Phase 5) ────────────────────────────────────────
+  dataShares = {
+    list: () =>
+      this.get<BusinessDataShare[]>('/admin/data-shares'),
+    grant: (data: { fromBusinessId: string; toBusinessId: string; dataTypes: BusinessShareDataType[] }) =>
+      this.post<BusinessDataShare>('/admin/data-shares', data),
+    revoke: (id: string) =>
+      this.delete<{ message: string }>(`/admin/data-shares/${id}`),
   };
 
   // ─── Analytics ─────────────────────────────────────────────────────────────
@@ -405,6 +452,15 @@ class ApiClient {
       this.post<CampaignTier>('/super-admin/campaign-tiers', data),
     updateCampaignTier: (id: string, data: Partial<{ label: string; maxRecipients: number; price: number; isActive: boolean }>) =>
       this.patch<CampaignTier>(`/super-admin/campaign-tiers/${id}`, data),
+    // ← NEW (Business approval/suspension UI)
+    listBusinesses: (params?: { status?: string; limit?: number; offset?: number; search?: string }) =>
+      this.get<PaginatedResponse<Business>>('/super-admin/businesses', { params }),
+    getBusiness: (id: string) =>
+      this.get<Business>(`/super-admin/businesses/${id}`),
+    updateBusinessStatus: (id: string, status: string) =>
+      this.patch<{ message: string; status: string }>(`/super-admin/businesses/${id}/status`, { status }),
+    updateBusinessScopes: (id: string, scopes: BusinessScope[]) =>
+      this.patch<{ message: string; businessScopes: BusinessScope[] }>(`/super-admin/businesses/${id}/scopes`, { scopes }),
   };
 }
 

@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { User } from '@/types';
 import { apiClient } from '@/services/api';
 import { queryClient } from '@/components/providers/query-provider';
+import useBusinessStore from './business.store';
 
 interface AuthState {
   user: User | null;
@@ -41,6 +42,9 @@ const useAuthStore = create<AuthState>()(
             isLoading: false,
             sessionRestored: true,
           });
+          // ← NEW (multi-tenancy) — load which business(es) this account
+          // can act within, so the switcher/header are ready immediately.
+          useBusinessStore.getState().fetchBusinesses();
         } catch (error: any) {
           const errorMessage =
             error?.response?.data?.message ||
@@ -65,6 +69,7 @@ const useAuthStore = create<AuthState>()(
           // this same browser tab can briefly see the previous user's
           // cached dashboard/orders/etc. data before the fresh fetch lands.
           queryClient.clear();
+          useBusinessStore.getState().clear(); // ← NEW (multi-tenancy)
           set({
             user: null,
             isAuthenticated: false,
@@ -99,6 +104,7 @@ const useAuthStore = create<AuthState>()(
             isLoading: false,
             sessionRestored: true,
           });
+          useBusinessStore.getState().fetchBusinesses(); // ← NEW (multi-tenancy)
         } catch {
           // Token invalid/expired — clear auth state
           set({
