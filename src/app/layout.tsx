@@ -7,6 +7,11 @@ import { ToastContainer } from '@/components/providers/toast';
 export const metadata: Metadata = {
   title: 'Zentra Admin',
   description: 'Admin panel for Zentra platform',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
