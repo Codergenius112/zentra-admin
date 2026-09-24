@@ -5,8 +5,8 @@ import { AuthProvider } from '@/components/providers/auth-provider';
 import { ToastContainer } from '@/components/providers/toast';
 
 export const metadata: Metadata = {
-  title: "D'Lifestyle Admin",
-  description: 'Admin panel for D\'Lifestyle platform',
+  title: 'Zentra Admin',
+  description: 'Admin panel for Zentra platform',
 };
 
 export default function RootLayout({

@@ -95,7 +95,7 @@ export default function DashboardLayout({
     <div className="flex h-screen bg-gray-100">
       <aside className="w-64 bg-blue-900 text-white flex flex-col">
         <div className="p-6 border-b border-blue-800">
-          <h1 className="text-2xl font-bold">D&apos;LIFESTYLE</h1>
+          <h1 className="text-2xl font-bold">ZENTRA</h1>
           <p className="text-blue-200 text-sm">Admin Portal</p>
         </div>
 
@@ -136,7 +136,7 @@ export default function DashboardLayout({
             <h2 className="text-xl font-semibold">
               {user
                 ? `Welcome, ${user.firstName} ${user.lastName}`
-                : "D'Lifestyle Admin"}
+                : 'Zentra Admin'}
             </h2>
             <div className="text-sm text-gray-500">{user?.email}</div>
           </div>
