@@ -2,12 +2,12 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import Cookies from 'js-cookie';
 import type {
   Booking, Order, AuditLog, DashboardMetrics, PlatformSettings,
-  ApartmentListing, CarListing, Event, TicketType, Venue,
+  ApartmentListing, CarListing, JetListing, Event, TicketType, Venue,
   InventoryItem, NotificationCampaign, CampaignTier, User, BusinessScope, PaginatedResponse,
   AuthResponse, Business, BusinessDataShare, BusinessShareDataType, StaffBusinessAssignment,
 } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL //|| 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 // Cookies with `secure: true` are silently dropped by the browser on
 // non-HTTPS origins (e.g. `npm start` on http://localhost:3000). Base the
 // flag on the actual page protocol, not NODE_ENV, so production builds
@@ -223,6 +223,8 @@ class ApiClient {
     // Powers the business switcher.
     list: () =>
       this.get<Business[]>('/admin/businesses'),
+    create: (data: { name: string; businessScopes: BusinessScope[]; payoutDetails?: Record<string, any> }) =>
+      this.post<Business>('/admin/businesses', data),
     // ← NEW (owner-facing business settings) — name/payoutDetails/isActive
     // only. Scopes and status stay super-admin-only (see superAdmin.*).
     update: (id: string, data: { name?: string; payoutDetails?: Record<string, any>; isActive?: boolean }) =>
@@ -350,6 +352,22 @@ class ApiClient {
       this.delete<void>(`/cars/listings/${id}`),
     bookings: (params?: { status?: string; limit?: number; offset?: number }) =>
       this.get<PaginatedResponse<Booking>>('/admin/bookings', { params: { ...params, bookingType: 'car' } }),
+  };
+
+  // ─── Private Jets & Helicopters ──────────────────────────────────────────
+  jets = {
+    listings: (params?: { category?: string; city?: string; limit?: number; offset?: number }) =>
+      this.get<PaginatedResponse<JetListing>>('/jets/listings', { params }),
+    getListing: (id: string) =>
+      this.get<JetListing>(`/jets/listings/${id}`),
+    createListing: (data: Partial<JetListing>) =>
+      this.post<JetListing>('/jets/listings', data),
+    updateListing: (id: string, data: Partial<JetListing>) =>
+      this.patch<JetListing>(`/jets/listings/${id}`, data),
+    deleteListing: (id: string) =>
+      this.delete<void>(`/jets/listings/${id}`),
+    bookings: (params?: { status?: string; limit?: number; offset?: number }) =>
+      this.get<PaginatedResponse<Booking>>('/admin/bookings', { params: { ...params, bookingType: 'jet' } }),
   };
 
   // ─── Queue ─────────────────────────────────────────────────────────────────

@@ -21,18 +21,17 @@ const navItemsData = [
   { label: 'Staff', href: '/staff', icon: '👥', roles: ALL_ADMIN_ROLES },
   { label: 'Analytics', href: '/analytics', icon: '📈', roles: [...ALL_ADMIN_ROLES] },
   { label: 'Events', href: '/events', icon: '🎪', scopes: [BusinessScope.EVENT_TICKETING] },
-  { label: 'Tickets', href: '/tickets', icon: '🎟️', scopes: [BusinessScope.EVENT_TICKETING] },
   { label: 'Tables', href: '/tables', icon: '🪑', scopes: [BusinessScope.TABLE_CLUB] },
   { label: 'Queue', href: '/queue', icon: '🚶', scopes: [BusinessScope.TABLE_CLUB] },
   { label: 'Venues', href: '/venues', icon: '🏢', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
   { label: 'Inventory', href: '/inventory', icon: '📦', scopes: [BusinessScope.TABLE_CLUB, BusinessScope.EVENT_TICKETING] },
   { label: 'Apartments', href: '/apartments', icon: '🏠', scopes: [BusinessScope.APARTMENT] },
   { label: 'Cars', href: '/cars', icon: '🚗', scopes: [BusinessScope.CAR_RENTAL] },
+  { label: 'Jets', href: '/jets', icon: '✈️', scopes: [BusinessScope.JET_CHARTER] },
   { label: 'Campaigns', href: '/campaigns', icon: '📣', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] },
   { label: 'Platform Settings', href: '/platform-settings', icon: '⚙️', roles: [UserRole.SUPER_ADMIN] },
-  { label: 'Data Sharing', href: '/data-sharing', icon: '🔗', roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN] }, // ← NEW (Phase 5 UI)
-  { label: 'Businesses', href: '/businesses', icon: '🏬', roles: [UserRole.SUPER_ADMIN] }, // ← NEW (business approval/suspension UI)
-  { label: 'Business Settings', href: '/business-settings', icon: '🏢', roles: [UserRole.ADMIN] }, // ← NEW (owner-facing business settings)
+  { label: 'Businesses', href: '/businesses', icon: '🏬', roles: [UserRole.SUPER_ADMIN] },
+  { label: 'Business Settings', href: '/business-settings', icon: '🏢', roles: [UserRole.ADMIN] },
   { label: 'Audit Log', href: '/audit', icon: '🔍', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
 ];
 
@@ -48,7 +47,9 @@ export default function DashboardLayout({
     logout: state.logout,
   }));
 
-  const { loaded: businessesLoaded, fetchBusinesses } = useBusinessStore();
+  const { businesses, activeBusinessId, loaded: businessesLoaded, fetchBusinesses } = useBusinessStore();
+
+  const activeBusiness = businesses.find((b) => b.id === activeBusinessId);
 
   // Safety net: if this layout mounts before the auth store's login/
   // restoreSession calls have kicked off the business fetch (e.g. a hard
@@ -66,8 +67,11 @@ export default function DashboardLayout({
   const hasScope = (scopes: BusinessScope[]) => {
     if (!user) return false;
     if (user.role === UserRole.SUPER_ADMIN) return true;
-    const userScopes: BusinessScope[] = user.businessScopes ?? [];
-    return scopes.some((s) => userScopes.includes(s));
+    const currentScopes: BusinessScope[] =
+      activeBusiness?.businessScopes && activeBusiness.businessScopes.length > 0
+        ? activeBusiness.businessScopes
+        : user.businessScopes ?? [];
+    return scopes.some((s) => currentScopes.includes(s));
   };
 
   const hasRole = (roles: UserRole[]) => {

@@ -42,6 +42,7 @@ export enum BusinessScope {
   APARTMENT = 'APARTMENT',
   TABLE_CLUB = 'TABLE_CLUB',
   EVENT_TICKETING = 'EVENT_TICKETING',
+  JET_CHARTER = 'JET_CHARTER',
 }
 
 // ← NEW (multi-tenancy)
@@ -307,6 +308,33 @@ export interface CarListing {
   city: string;
   state: string;
   withDriver: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JetListing {
+  id: string;
+  businessId?: string | null;
+  name: string;
+  model: string;
+  manufacturer: string;
+  category: string;
+  tailNumber: string;
+  capacity: number;
+  rangeNauticalMiles?: number | null;
+  cruisingSpeedKnots?: number | null;
+  pricePerHour: number;
+  cautionFee: number;
+  cautionFeeRefundable: boolean;
+  baseAirport: string;
+  city: string;
+  country: string;
+  description: string;
+  features: string[];
+  amenities: string[];
+  images: string[];
+  unavailableDates?: string[] | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

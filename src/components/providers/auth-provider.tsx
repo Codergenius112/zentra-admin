@@ -29,7 +29,6 @@ const ROUTE_ACCESS: Record<string, RouteAccess> = {
   '/cars':              { scopes: [BusinessScope.CAR_RENTAL] },
   '/inventory':         { roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPER_ADMIN] },
   '/campaigns':         { roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPER_ADMIN] },
-  '/scanner':           { roles: [UserRole.DOOR_STAFF, UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPER_ADMIN] },
   '/platform-settings': { superAdminOnly: true },
 };
  
