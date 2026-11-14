@@ -308,6 +308,8 @@ export interface CarListing {
   city: string;
   state: string;
   withDriver: boolean;
+  escortAvailable: boolean;
+  escortPrice: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
