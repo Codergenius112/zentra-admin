@@ -44,21 +44,17 @@ function QRScanTab() {
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [processing, setProcessing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const processingRef = useRef(false);
+  const cameraScanCompleteRef = useRef(false);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    processingRef.current = processing;
-  }, [processing]);
 
   useEffect(() => {
     if (cameraActive && hasPermission && videoRef.current && streamRef.current) {
@@ -79,9 +75,9 @@ function QRScanTab() {
   }, []);
 
   const handleQRData = useCallback(
-    async (data: string) => {
-      if (processingRef.current) return;
-      setProcessing(true);
+    async (data: string, fromCamera = false) => {
+      if (processingRef.current || (fromCamera && cameraScanCompleteRef.current)) return;
+      processingRef.current = true;
       setResult(null);
       try {
         let qrPayload = data;
@@ -93,6 +89,8 @@ function QRScanTab() {
         }
         const booking = await apiClient.tickets.scan(qrPayload.trim());
         setResult({ success: true, booking });
+        cameraScanCompleteRef.current = true;
+        stopCamera();
         addToast('Ticket checked in successfully', 'success');
         if ('vibrate' in navigator) navigator.vibrate(200);
       } catch (e: any) {
@@ -100,10 +98,10 @@ function QRScanTab() {
         setResult({ success: false, message: msg });
         addToast(msg, 'error');
       } finally {
-        setProcessing(false);
+        processingRef.current = false;
       }
     },
-    [addToast],
+    [addToast, stopCamera],
   );
 
   const startScanLoop = useCallback(() => {
@@ -123,7 +121,7 @@ function QRScanTab() {
           // @ts-ignore
           const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
           const barcodes = await detector.detect(canvas);
-          if (barcodes.length > 0) await handleQRData(barcodes[0].rawValue);
+          if (barcodes.length > 0) await handleQRData(barcodes[0].rawValue, true);
         } catch (err) {
           console.error('Detection error:', err);
         }
@@ -133,6 +131,8 @@ function QRScanTab() {
 
   const startCamera = useCallback(async () => {
     try {
+      setResult(null);
+      cameraScanCompleteRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
       setHasPermission(true);
@@ -160,17 +160,10 @@ function QRScanTab() {
   }, []);
 
   const handleManualScan = async () => {
-    if (!qrInput.trim()) return;
+    if (!qrInput.trim() || processingRef.current) return;
     setScanning(true);
-    setResult(null);
     try {
-      const booking = await apiClient.tickets.scan(qrInput.trim());
-      setResult({ success: true, booking });
-      addToast('Ticket checked in successfully', 'success');
-    } catch (e: any) {
-      const msg = e?.response?.data?.message ?? 'Invalid or already scanned ticket';
-      setResult({ success: false, message: msg });
-      addToast(msg, 'error');
+      await handleQRData(qrInput.trim());
     } finally {
       setScanning(false);
       setQrInput('');
